@@ -1,0 +1,85 @@
+=================================================================
+STRICT RULE — NO REPLIT DEPENDENCIES OR REPLIT-SPECIFIC TOOLS
+=================================================================
+Use only .env. Never charge cards directly. Apple IAP, Google
+Play Billing, and Stripe are the three providers. All keys via
+.env. No Replit storage for receipts.
+=================================================================
+
+CONTEXT:
+The Subscription model exists (Prompt 3). Auth, profile, workout,
+and streaks are all working. We now add subscription state.
+
+GOAL:
+Implement the trust-critical subscription module. Every
+requirement here exists because it shows up as a 1-star Elevate
+review. Read FR-6.x in the requirements doc and implement them.
+
+DELIVERABLES:
+1. Deps: stripe (server SDK), apple-receipt-verifier (or fetch
+   directly to Apple's verifyReceipt endpoint), google-auth-library
+   for Google Play receipt verification.
+2. /apps/api/.env.example append:
+     STRIPE_SECRET_KEY=
+     STRIPE_WEBHOOK_SECRET=
+     APPLE_SHARED_SECRET=
+     GOOGLE_PLAY_SERVICE_ACCOUNT_JSON=    # path or base64-encoded
+     SUBSCRIPTION_TRIAL_DAYS=7
+     SUBSCRIPTION_REMINDER_HOURS=48        # FR-6.3
+3. /apps/api/src/services/billing/
+     - apple.ts        — verifyAppleReceipt(token)
+     - google.ts       — verifyGooglePlayReceipt(productId, token)
+     - stripe.ts       — webhook handler factory
+     - index.ts        — unified `validateAndSync(provider, payload)`
+4. /apps/api/src/routes/subscription.ts:
+     GET  /subscription                      → current state
+     POST /subscription/validate-receipt      → mobile sends a
+                                                store receipt;
+                                                server validates,
+                                                upserts Subscription
+     POST /subscription/cancel                → marks
+                                                cancelAtPeriodEnd
+                                                (does NOT call store
+                                                APIs — store is the
+                                                source of truth for
+                                                in-app purchases)
+     GET  /subscription/plans                 → public price list
+                                                with explicit
+                                                currency, period,
+                                                trial-days
+5. Webhook routes:
+     POST /webhooks/stripe       — verifies signature, handles
+                                   customer.subscription.* events
+     POST /webhooks/apple        — App Store Server Notifications V2
+     POST /webhooks/google       — Real-time Developer Notifications
+6. A scheduled job-route POST /admin/cron/billing (CRON_SECRET):
+     - Sends a 48-hour-before-trial-ends reminder (FR-6.3)
+     - Sends a receipt email within 5 minutes of charge (FR-6.4)
+   For now, "send" = log + write a row to a notifications table.
+   Wire actual email in Prompt 10.
+7. Add a `BillingEvent` model in Prisma to log every state change
+   (received receipts, webhooks, cancellations) for audit /
+   self-service refund support.
+8. Tests:
+     - happy path: validate Apple receipt → Subscription row
+       updated to "active"
+     - cancel: status flips, currentPeriodEnd retained
+     - webhook signature mismatch → 400, no state change
+9. README section: how to wire up Stripe, Apple, Google in dev
+   (no real keys committed; .env.example documents every var).
+
+DO NOT:
+- Store credit card numbers or PANs anywhere. Ever.
+- Call any provider with secrets read from anywhere other than
+  process.env.
+- Auto-renew offers that the user did not see (FR-6.6).
+
+VERIFY:
+- A simulated Apple receipt updates Subscription.status.
+- /subscription/cancel sets cancelAtPeriodEnd=true and the
+  response includes the exact end date.
+- Webhook signature verification works (test with a known sig).
+
+OUTPUT:
+Print the subscription state machine, the webhook list, and
+the test results.

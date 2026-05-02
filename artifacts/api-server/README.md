@@ -1,159 +1,95 @@
 # NeuroFit API Server
 
-Express 5 backend for the NeuroFit brain-training app.
+Express 5 + Drizzle + Postgres. JWT auth (access + refresh), workouts,
+adaptive engine, streaks, and subscriptions.
 
-## Stack
-
-- **Runtime**: Node.js (ESM)
-- **Framework**: Express 5
-- **ORM**: Drizzle ORM
-- **Database**: PostgreSQL (any provider — see below)
-- **Auth**: JWT (access + refresh tokens, bcrypt passwords)
-- **Validation**: Zod
-- **Logging**: Pino (Authorization headers redacted)
-
-## Getting Started
-
-### 1. Environment variables
+## Run
 
 ```bash
 cp .env.example .env
-```
-
-**Database** — set `DATABASE_URL` to your PostgreSQL connection string. Any of these work:
-
-| Provider | Notes |
-|---|---|
-| [Neon](https://neon.tech) | Serverless Postgres, generous free tier |
-| [Supabase](https://supabase.com) | Postgres + extras, free tier available |
-| [Railway](https://railway.app) | Simple Postgres deployments |
-| Local Docker | `docker run -e POSTGRES_PASSWORD=pass -p 5432:5432 postgres:16` |
-
-**JWT secrets** — generate strong secrets (never commit real values):
-
-```bash
-openssl rand -base64 48   # run twice: once for ACCESS, once for REFRESH
-```
-
-Then set in `.env`:
-```
-JWT_ACCESS_SECRET=<output of first command>
-JWT_REFRESH_SECRET=<output of second command>
-```
-
-### 2. Install dependencies
-
-```bash
-pnpm install
-```
-
-### 3. Migrate the database
-
-```bash
-pnpm --filter @workspace/api-server run db:generate
-pnpm --filter @workspace/api-server run db:migrate
-```
-
-### 4. Seed initial data
-
-```bash
-pnpm --filter @workspace/api-server run db:seed
-```
-
-Inserts 6 games (one per domain) with 5 difficulty-banded items each, plus a demo user in development.
-
-### 5. Start the dev server
-
-```bash
 pnpm --filter @workspace/api-server run dev
 ```
 
-## Auth API
+## Billing setup (FR-6.x)
 
-All error responses follow: `{ error: { code, message, requestId } }`
+Three providers are wired in. None of them require Replit-specific
+configuration — every secret lives in `process.env`.
 
-| Method | Path | Auth | Description |
-|---|---|---|---|
-| `POST` | `/api/auth/register` | — | Register with email + password |
-| `POST` | `/api/auth/login` | — | Login, returns token pair |
-| `POST` | `/api/auth/refresh` | — | Rotate tokens using refreshToken |
-| `POST` | `/api/auth/logout` | Bearer | Invalidate refresh tokens |
-| `GET` | `/api/auth/me` | Bearer | Current user + profile |
-| `POST` | `/api/auth/apple` | — | Stub — returns 501 |
-| `POST` | `/api/auth/google` | — | Stub — returns 501 |
+### Stripe (web checkout)
 
-### Sample requests
+1. Create an account at <https://dashboard.stripe.com>.
+2. Create a recurring product per plan in **Products** with the lookup keys
+   `neurofit_monthly_v1` and `neurofit_yearly_v1` (matches the catalogue in
+   `lib/shared/src/subscription.ts`). When you create the Stripe Checkout
+   session, set `subscription_data.metadata.userId` to the NeuroFit user id
+   so we can route webhook events back to the right account.
+3. **Settings → Developers → API keys**: copy the secret key into
+   `STRIPE_SECRET_KEY` in `.env`.
+4. **Settings → Developers → Webhooks → Add endpoint**:
+   - URL: `https://<your-domain>/api/webhooks/stripe`
+   - Events: `customer.subscription.created`, `customer.subscription.updated`,
+     `customer.subscription.deleted`
+   - Copy the signing secret into `STRIPE_WEBHOOK_SECRET`.
+5. Local testing: install the Stripe CLI and run
+   `stripe listen --forward-to localhost:8080/api/webhooks/stripe` — the CLI
+   prints a `whsec_…` signing secret you can use as your dev
+   `STRIPE_WEBHOOK_SECRET`. Trigger events with `stripe trigger
+   customer.subscription.updated`.
 
-**Register**
-```bash
-curl -X POST /api/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{"email":"you@example.com","password":"supersecret"}'
-# → 201 { user: { id, email }, accessToken, refreshToken }
-```
+The webhook **must** receive the raw request body — we mount it with
+`express.raw({ type: "application/json" })` in `src/app.ts` BEFORE the
+global JSON parser. Don't move it.
 
-**Login**
-```bash
-curl -X POST /api/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"email":"you@example.com","password":"supersecret"}'
-# → 200 { user: { id, email }, accessToken, refreshToken }
-```
+### Apple App Store (iOS in-app purchase)
 
-**Refresh**
-```bash
-curl -X POST /api/auth/refresh \
-  -H "Content-Type: application/json" \
-  -d '{"refreshToken":"<token>"}'
-# → 200 { accessToken, refreshToken }
-```
+1. Create an in-app subscription in App Store Connect with product IDs
+   `neurofit_monthly_v1` and `neurofit_yearly_v1`.
+2. **App Information → App-Specific Shared Secret**: copy the value into
+   `APPLE_SHARED_SECRET`. We pass this to the legacy `/verifyReceipt`
+   endpoint.
+3. **App Store Server Notifications V2**: configure both production and
+   sandbox URLs to `https://<your-domain>/api/webhooks/apple`. Notifications
+   are persisted to `billing_events`; full JWS chain verification ships in
+   Prompt 10.
+4. Local testing: use the App Store sandbox tester accounts. Our verifier
+   automatically retries `/verifyReceipt` against the sandbox endpoint when
+   it sees status `21007`.
 
-**Me**
-```bash
-curl /api/auth/me \
-  -H "Authorization: Bearer <accessToken>"
-# → 200 { user: { id, email, createdAt }, profile: null | { ... } }
-```
+### Google Play (Android in-app purchase)
 
-**Logout**
-```bash
-curl -X POST /api/auth/logout \
-  -H "Authorization: Bearer <accessToken>"
-# → 204
-```
+1. Create an in-app subscription in Google Play Console with product IDs
+   `neurofit_monthly_v1` and `neurofit_yearly_v1`. Set
+   `GOOGLE_PLAY_PACKAGE_NAME` to your package id.
+2. In Google Cloud Console, create a service account with the
+   **Android Publisher** API enabled. Grant it "View financial data" on the
+   app from Play Console → Users and permissions.
+3. Download the JSON key. Either:
+   - Save it to a path on the server and point
+     `GOOGLE_PLAY_SERVICE_ACCOUNT_JSON` at the absolute file path, or
+   - Base64-encode it and put the encoded value into the env var directly
+     (handy for hosts that only support env strings).
+4. **Real-time Developer Notifications**: in Play Console → Monetization
+   setup, set up a Pub/Sub topic that pushes to
+   `https://<your-domain>/api/webhooks/google`. Production deployments
+   should add OIDC authentication to the push subscription (verified in
+   Prompt 10).
 
-## Security notes
+## Cron
 
-- Passwords hashed with bcrypt (12 rounds)
-- Refresh tokens carry `tokenVersion`; logout increments it, invalidating all refresh tokens server-side
-- `Authorization` headers are redacted from request logs
-- Login is rate-limited to 10 requests/minute per IP
+`/api/admin/cron/daily` and `/api/admin/cron/billing` are protected by the
+`CRON_SECRET` env var sent in the `x-cron-secret` header. Drive them from
+**any** scheduler — Render Cron, Fly Machines, GitHub Actions, cron-job.org,
+or plain crontab. Both endpoints are idempotent; calling them twice does
+nothing harmful.
 
-## Database scripts
+Recommended frequency:
 
-| Script | Command |
-|---|---|
-| Generate migration | `pnpm --filter @workspace/api-server run db:generate` |
-| Apply migrations | `pnpm --filter @workspace/api-server run db:migrate` |
-| Seed data | `pnpm --filter @workspace/api-server run db:seed` |
+- `/cron/daily` — once per day at 00:05 UTC (monthly freeze top-up).
+- `/cron/billing` — every 30 minutes (catches FR-6.4 receipt-within-5-minutes).
 
 ## Tests
 
 ```bash
 pnpm --filter @workspace/api-server run test
+pnpm --filter @workspace/api-server run typecheck
 ```
-
-## Schema
-
-All tables in `lib/db/src/schema/`:
-
-| File | Tables |
-|---|---|
-| `users.ts` | `users` (+ `token_version` for refresh invalidation) |
-| `profiles.ts` | `profiles` |
-| `proficiency.ts` | `proficiency_scores` |
-| `games.ts` | `games`, `game_items` |
-| `sessions.ts` | `workout_sessions`, `progress_events` |
-| `streaks.ts` | `streaks` |
-| `subscriptions.ts` | `subscriptions` |
-| `reports.ts` | `content_reports` |

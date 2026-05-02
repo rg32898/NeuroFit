@@ -1,0 +1,63 @@
+=================================================================
+STRICT RULE — NO REPLIT DEPENDENCIES OR REPLIT-SPECIFIC TOOLS
+=================================================================
+Use only .env. Email via SMTP or Resend SDK (vendor-neutral, both
+work anywhere). Push notifications via Expo Push for dev and
+FCM/APNs for prod (keys in .env).
+=================================================================
+
+CONTEXT:
+Subscription and streaks are wired (Prompts 8–9). We now add
+the supporting endpoints: content reports, support tickets,
+and outbound notifications.
+
+GOAL:
+Round out the backend with the long tail of endpoints the mobile
+app needs.
+
+DELIVERABLES:
+1. /apps/api/src/routes/reports.ts:
+     POST /reports/content   { gameItemId, category, message }
+                              → creates a ContentReport
+     GET  /reports/mine      → user's own reports
+2. /apps/api/src/routes/support.ts:
+     POST /support/tickets   → creates a Ticket row (new model)
+     GET  /support/tickets/:id → status of own ticket
+   Add a `Ticket` Prisma model: id, userId, category, subject,
+   body, status, createdAt, updatedAt.
+3. /apps/api/src/services/notifications/
+     - email.ts   — sendEmail({to, subject, html}) — uses
+                    nodemailer with SMTP config from .env, OR
+                    Resend if RESEND_API_KEY is set. Falls back
+                    to console-log in NODE_ENV=development.
+     - push.ts    — sendPush({userId, title, body}) — Expo Push
+                    if EXPO_ACCESS_TOKEN set; otherwise log only.
+4. /apps/api/.env.example append:
+     SMTP_HOST=
+     SMTP_PORT=587
+     SMTP_USER=
+     SMTP_PASS=
+     RESEND_API_KEY=
+     EXPO_ACCESS_TOKEN=
+     FROM_EMAIL=hello@neurofit.example
+5. A `Notification` model in Prisma to log every send (channel,
+   recipient, status, template, sentAt). Useful for debugging
+   missing-receipt complaints.
+6. Tests:
+     - POST /reports/content stores a row and returns 201
+     - sendEmail in dev mode writes to logs without throwing
+     - duplicate report on same itemId from same user within
+       24 hours returns the original (idempotent)
+
+DO NOT:
+- Use any vendor-locked notification SaaS as a hard dependency.
+- Send marketing emails without an opt-in flag check (FR-8.4).
+
+VERIFY:
+- Submitting a content report shows up in DB and the admin queue
+  query (anticipated in Prompt 18).
+- sendEmail logs in dev; doesn't crash if SMTP/RESEND missing.
+
+OUTPUT:
+List of new routes, models, and notification channels with their
+fallback behaviour.

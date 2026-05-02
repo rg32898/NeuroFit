@@ -34,6 +34,18 @@ const envSchema = z.object({
     .string()
     .min(1)
     .default("dev-support-token-change-in-production"),
+
+  // Billing (FR-6.x). All optional in dev so the server boots without them;
+  // each provider's verifier throws a clear error if invoked while unset.
+  STRIPE_SECRET_KEY: z.string().optional(),
+  STRIPE_WEBHOOK_SECRET: z.string().optional(),
+  APPLE_SHARED_SECRET: z.string().optional(),
+  // File path OR base64-encoded JSON of the GCP service account key.
+  GOOGLE_PLAY_SERVICE_ACCOUNT_JSON: z.string().optional(),
+  GOOGLE_PLAY_PACKAGE_NAME: z.string().optional(),
+
+  SUBSCRIPTION_TRIAL_DAYS: z.coerce.number().int().positive().default(7),
+  SUBSCRIPTION_REMINDER_HOURS: z.coerce.number().int().positive().default(48),
 });
 
 const result = envSchema.safeParse(process.env);

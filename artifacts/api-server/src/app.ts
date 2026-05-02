@@ -9,6 +9,7 @@ import { logger } from "./lib/logger";
 import { errorHandler } from "./middlewares/error";
 import { requestId } from "./middlewares/requestId";
 import router from "./routes";
+import { stripeWebhookHandler } from "./routes/webhooks/stripe";
 
 const app: Express = express();
 
@@ -54,6 +55,15 @@ app.use(
       },
     },
   }),
+);
+
+// Stripe webhook MUST receive the raw request body so its HMAC signature
+// stays verifiable. Mounted BEFORE the global JSON parser, scoped to this
+// one path — every other route still gets express.json().
+app.post(
+  "/api/webhooks/stripe",
+  express.raw({ type: "application/json" }),
+  stripeWebhookHandler,
 );
 
 // Body parsing
