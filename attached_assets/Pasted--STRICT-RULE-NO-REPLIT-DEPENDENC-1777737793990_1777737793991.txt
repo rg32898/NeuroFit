@@ -1,0 +1,80 @@
+=================================================================
+STRICT RULE — NO REPLIT DEPENDENCIES OR REPLIT-SPECIFIC TOOLS
+=================================================================
+DO NOT use Replit Auth or any third-party identity provider as a
+hard dependency. Use JWTs signed with a secret in .env. OAuth
+(Apple, Google) hooks are placeholders only — wire actual provider
+secrets via .env.example.
+=================================================================
+
+CONTEXT:
+We have an Express skeleton (Prompt 2) and a Prisma schema with a
+User model (Prompt 3). No auth routes exist yet.
+
+GOAL:
+Add a complete JWT-based auth system with email/password,
+refresh tokens, and stub endpoints for Apple/Google sign-in.
+
+DELIVERABLES:
+1. Deps to /apps/api: bcryptjs, jsonwebtoken, @types/bcryptjs,
+   @types/jsonwebtoken.
+2. /apps/api/.env.example append:
+     JWT_ACCESS_SECRET=replace_me_with_long_random_string
+     JWT_REFRESH_SECRET=replace_me_with_another_long_random_string
+     JWT_ACCESS_TTL=15m
+     JWT_REFRESH_TTL=30d
+     APPLE_CLIENT_ID=
+     APPLE_TEAM_ID=
+     APPLE_KEY_ID=
+     APPLE_PRIVATE_KEY=
+     GOOGLE_CLIENT_ID=
+     GOOGLE_CLIENT_SECRET=
+3. /apps/api/src/auth/tokens.ts:
+     - signAccessToken(userId)
+     - signRefreshToken(userId, tokenVersion)
+     - verifyAccess / verifyRefresh
+4. /apps/api/src/auth/passwords.ts: hash and compare via bcrypt.
+5. /apps/api/src/middleware/requireAuth.ts — verifies the
+   Authorization: Bearer header, attaches req.user.
+6. /apps/api/src/routes/auth.ts:
+     POST /auth/register   { email, password }
+     POST /auth/login      { email, password }
+     POST /auth/refresh    { refreshToken }
+     POST /auth/logout     (invalidate refresh on this device)
+     POST /auth/apple      { idToken }   — stub: returns 501
+     POST /auth/google     { idToken }   — stub: returns 501
+     GET  /auth/me         requires auth, returns user + profile
+   All inputs validated with Zod schemas. All errors return a
+   consistent shape: { error: { code, message, requestId } }.
+7. Add a `tokenVersion: Int @default(0)` field to User in
+   schema.prisma. Run a migration. Increment on logout-all and on
+   password change so refresh tokens can be invalidated server-side.
+8. Tests in /apps/api/test/auth.test.ts:
+     - register → login → refresh → me happy path
+     - duplicate email → 409
+     - wrong password → 401
+     - expired access token → 401
+     - reused-after-logout refresh token → 401
+9. README update: how to set the JWT secrets and a one-liner to
+   generate good ones via `openssl rand -base64 48`.
+
+SECURITY DETAILS:
+- Use 12 bcrypt rounds.
+- Refresh tokens contain the user's tokenVersion; if it doesn't
+  match the DB, reject.
+- Never log passwords or tokens. Mask Authorization headers in
+  pino-http.
+- Rate-limit /auth/login (e.g., express-rate-limit, 10/min/IP).
+
+DO NOT:
+- Hardcode any secret. Everything via config.ts.
+- Use any third-party auth-as-a-service SDK.
+
+VERIFY:
+- All auth tests pass.
+- /auth/register returns user + accessToken + refreshToken.
+- /auth/me with the access token returns the user.
+
+OUTPUT:
+Print the auth route list, sample request/response for each, and
+the test results.
