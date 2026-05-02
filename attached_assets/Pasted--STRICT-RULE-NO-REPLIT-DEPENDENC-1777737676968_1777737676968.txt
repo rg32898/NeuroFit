@@ -1,0 +1,172 @@
+=================================================================
+STRICT RULE — NO REPLIT DEPENDENCIES OR REPLIT-SPECIFIC TOOLS
+=================================================================
+DO NOT use Replit DB. Use external Postgres only via a
+DATABASE_URL connection string in .env. Recommend Neon, Supabase,
+Railway, or local Docker Postgres in the README.
+=================================================================
+
+CONTEXT:
+The Express skeleton from Prompt 2 is running. /apps/api has
+config.ts, logger.ts, /health, and tests. We will now add
+Prisma + PostgreSQL.
+
+GOAL:
+Add Prisma to /apps/api with the full schema needed for the
+brain-training app. Generate the client. Add a seed script.
+DO NOT wire up any HTTP routes that touch the DB yet — only
+schema, client, and seeds.
+
+DELIVERABLES:
+1. Add deps to /apps/api: prisma (dev), @prisma/client.
+2. /apps/api/.env.example: append
+     DATABASE_URL="postgresql://user:pass@localhost:5432/neurofit?schema=public"
+3. /apps/api/prisma/schema.prisma with these models (use snake
+   case in DB via @map, camelCase in code):
+
+     generator client       — provider "prisma-client-js"
+     datasource db          — provider "postgresql", url env("DATABASE_URL")
+
+     model User
+       id              String    @id @default(cuid())
+       email           String?   @unique
+       passwordHash    String?
+       appleSub        String?   @unique
+       googleSub       String?   @unique
+       createdAt       DateTime  @default(now())
+       deletedAt       DateTime?
+       profile         Profile?
+       progress        ProgressEvent[]
+       sessions        WorkoutSession[]
+       subscription    Subscription?
+       reports         ContentReport[]
+
+     model Profile
+       userId          String    @id
+       user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+       displayName     String?
+       birthYear       Int?
+       focusDomain     String?    // "vocabulary" | "writing" | ...
+       relaxedMode     Boolean    @default(true)
+       timerScale      Int        @default(100)  // 100|125|150|175|200 = 100% / 75% / 50% / 25% / off
+       createdAt       DateTime   @default(now())
+       updatedAt       DateTime   @updatedAt
+
+     model ProficiencyScore
+       id              String    @id @default(cuid())
+       userId          String
+       domain          String     // "vocabulary","writing","reading","speaking","math","memory"
+       score           Int        // 0..5000
+       updatedAt       DateTime   @updatedAt
+       @@unique([userId, domain])
+
+     model Game
+       id              String    @id @default(cuid())
+       slug            String    @unique
+       title           String
+       domain          String
+       description     String
+       averageDurationSec Int
+       supportsRelaxed Boolean    @default(true)
+       isFreeTier      Boolean    @default(false)
+       isPublished     Boolean    @default(false)
+       createdAt       DateTime   @default(now())
+       items           GameItem[]
+
+     model GameItem
+       id              String    @id @default(cuid())
+       gameId          String
+       game            Game       @relation(fields: [gameId], references: [id], onDelete: Cascade)
+       payload         Json       // game-specific shape
+       difficultyBand  Int        // 1..5
+       version         Int        @default(1)
+       reviewedById    String?
+       reviewedAt      DateTime?
+       isPublished     Boolean    @default(false)
+       createdAt       DateTime   @default(now())
+       reports         ContentReport[]
+
+     model WorkoutSession
+       id              String    @id @default(cuid())
+       userId          String
+       user            User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+       date            DateTime   @default(now())
+       gamesPlanned    Json       // array of game ids
+       completedAt     DateTime?
+       events          ProgressEvent[]
+
+     model ProgressEvent
+       id              String    @id @default(cuid())
+       userId          String
+       user            User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+       sessionId       String?
+       session         WorkoutSession? @relation(fields: [sessionId], references: [id])
+       eventType       String     // "GAME_COMPLETED" | "STREAK_FREEZE_USED" | ...
+       gameId          String?
+       itemId          String?
+       score           Int?
+       durationMs      Int?
+       payload         Json?
+       clientEventId   String     // device-generated UUID for idempotency
+       createdAt       DateTime   @default(now())
+       @@unique([userId, clientEventId])
+
+     model Streak
+       userId          String    @id
+       user            User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+       current         Int        @default(0)
+       longest         Int        @default(0)
+       lastActiveDate  DateTime?
+       freezesAvailable Int       @default(2)
+       freezesResetAt  DateTime?
+       updatedAt       DateTime   @updatedAt
+
+     model Subscription
+       userId          String    @id
+       user            User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+       status          String     // "trialing"|"active"|"cancelled"|"past_due"|"none"
+       plan            String     // "free"|"premium_monthly"|"premium_annual"|"family_annual"
+       currentPeriodEnd DateTime?
+       cancelAtPeriodEnd Boolean  @default(false)
+       provider        String     // "apple"|"google"|"stripe"
+       providerSubscriptionId String?
+       updatedAt       DateTime   @updatedAt
+
+     model ContentReport
+       id              String    @id @default(cuid())
+       reporterId      String
+       reporter        User       @relation(fields: [reporterId], references: [id])
+       gameItemId      String?
+       gameItem        GameItem?  @relation(fields: [gameItemId], references: [id])
+       category        String     // "incorrect_answer"|"unclear"|"offensive"|"other"
+       message         String
+       status          String     @default("open")  // "open"|"triaged"|"resolved"|"rejected"
+       createdAt       DateTime   @default(now())
+
+4. /apps/api/src/db.ts — exports a singleton PrismaClient with
+   sensible logging.
+5. /apps/api/prisma/seed.ts — seeds:
+     - 6 sample Game rows (one per domain, isPublished: true)
+     - 5 GameItems per game, difficultyBand 1..5, isPublished: true
+     - One demo user (only in NODE_ENV !== "production")
+6. Wire up the seed script in package.json:
+     "prisma": { "seed": "tsx prisma/seed.ts" }
+   And add scripts: "db:generate", "db:migrate", "db:seed".
+7. Update README at the api root with the database setup steps
+   (point at Neon, Supabase, Railway, or `docker run postgres`).
+
+DO NOT:
+- Add any HTTP routes touching the DB yet
+- Use Prisma Accelerate, Prisma Pulse, or Prisma Data Platform —
+  vanilla self-hosted Prisma only
+- Use Replit's Postgres add-on as the documented default
+
+VERIFY:
+- `pnpm --filter api db:generate` succeeds
+- `pnpm --filter api db:migrate` creates the migration after
+  setting DATABASE_URL in .env
+- `pnpm --filter api db:seed` populates the games + items
+- The /health endpoint still returns 200
+
+OUTPUT:
+Show schema.prisma, the migration name, and seed output counts.
