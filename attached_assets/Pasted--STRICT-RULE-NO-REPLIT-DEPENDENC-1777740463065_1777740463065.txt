@@ -1,0 +1,64 @@
+=================================================================
+STRICT RULE — NO REPLIT DEPENDENCIES OR REPLIT-SPECIFIC TOOLS
+=================================================================
+Use only .env for config. No Replit-specific packages or storage.
+=================================================================
+
+CONTEXT:
+Catalogue, profile, and proficiency exist (Prompts 5–6). We now
+add the daily workout assembler and the adaptive difficulty rules.
+
+GOAL:
+Implement the daily workout endpoint and the bidirectional
+adaptive difficulty engine described in §5.2 and §5.3 of the
+requirements doc.
+
+DELIVERABLES:
+1. /apps/api/src/services/adaptiveEngine.ts:
+     - evaluatePerformance(userId, domain): given the user's
+       last 5 ProgressEvents in that domain, returns one of
+       "RAISE" | "HOLD" | "LOWER".
+     - applyAdjustment(userId, domain, decision): updates
+       ProficiencyScore atomically.
+     - "Two consecutive sessions above the 70th percentile" →
+       RAISE; "two below 30th" or explicit user "too hard" signal
+       → LOWER.
+2. /apps/api/src/services/workoutService.ts:
+     buildDailyWorkout(userId, date): returns 3–5 games chosen
+     to:
+       - cover the user's focus domain at minimum once
+       - balance the other 5 domains over a rolling 7-day window
+       - respect the user's free/premium tier (FR-3.2)
+       - target ≤ 12 minutes total duration
+     Persists a WorkoutSession with gamesPlanned.
+3. /apps/api/src/routes/workout.ts:
+     GET  /workout/today           → current daily workout
+                                      (creates one if none for today)
+     POST /workout/:id/complete    → marks the session completed,
+                                      returns updated streak +
+                                      proficiency deltas
+     POST /workout/signal-too-hard { gameId, itemId }
+                                   → triggers a LOWER decision
+4. Unit tests:
+     - adaptiveEngine returns RAISE/LOWER/HOLD correctly across
+       a battery of fixture event histories.
+     - buildDailyWorkout always includes the focus domain.
+     - buildDailyWorkout for a free-tier user contains only
+       games where isFreeTier=true OR the rotation rule is true.
+5. Integration test: register → seed events for a user that
+   simulate two great sessions → call /workout/today → verify
+   ProficiencyScore went up.
+
+DO NOT:
+- Pre-generate workouts in a cron. They are computed on demand
+  on first request of the day.
+- Allow the engine to RAISE difficulty after a poor performance,
+  ever — that was the explicit Elevate complaint (L-8).
+
+VERIFY:
+- `GET /workout/today` returns 3–5 games with planned order.
+- After marking complete, /profile shows updated scores.
+- Tests pass.
+
+OUTPUT:
+Show the workout response shape and the test summary.
