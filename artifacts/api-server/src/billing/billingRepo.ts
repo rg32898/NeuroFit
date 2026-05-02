@@ -4,7 +4,6 @@ import {
   notificationsTable,
   subscriptionsTable,
   type BillingEvent,
-  type Notification,
   type Subscription,
 } from "@workspace/db";
 import { and, eq, gte, isNull, lte, sql } from "drizzle-orm";
@@ -158,30 +157,14 @@ export async function insertBillingEvent(
   return row ?? null;
 }
 
-// ── Notifications (queue, not transport) ─────────────────────────────────────
-
-export async function createNotification(
-  userId: string,
-  kind: "trial_reminder" | "receipt",
-  payload: unknown,
-): Promise<Notification> {
-  const [row] = await db
-    .insert(notificationsTable)
-    .values({
-      id: crypto.randomUUID(),
-      userId,
-      kind,
-      status: "pending",
-      payload,
-    })
-    .returning();
-  return row!;
-}
+// ── Notifications (lookup helpers) ───────────────────────────────────────────
 
 /**
  * Recently-completed payment events (last `lookbackMs`) that don't yet have
- * a corresponding `receipt` notification queued for the user. This is FR-6.4
- * — receipt within 5 minutes of charge.
+ * a corresponding `receipt` notification logged for the user. FR-6.4 —
+ * receipt within 5 minutes of charge. The NOT EXISTS subquery is what makes
+ * this safe to call repeatedly: once a receipt has been sent (logged into
+ * notifications), the same billing event is skipped.
  */
 export async function findPaymentsNeedingReceipt(
   now: Date,

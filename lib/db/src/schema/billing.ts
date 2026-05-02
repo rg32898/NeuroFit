@@ -41,21 +41,31 @@ export type InsertBillingEvent = typeof billingEventsTable.$inferInsert;
 export type BillingEvent = typeof billingEventsTable.$inferSelect;
 
 /**
- * Outbound notification queue. The billing cron writes rows here; an actual
- * email/push transport is wired in Prompt 10. Keeping the queue in the DB
- * means we have at-least-once delivery semantics + an audit trail for
- * "I never got my receipt" support tickets.
+ * Outbound notification SEND LOG. Every call to sendEmail / sendPush appends
+ * a row here regardless of outcome — this is the audit trail we use to debug
+ * "I never got my receipt" / "I never got my trial reminder" complaints.
+ *
+ * NOT a queue. The transport is invoked synchronously from the cron / route
+ * handler; rows here represent attempts, not pending work.
  */
 export const notificationsTable = pgTable("notifications", {
   id: text("id").primaryKey(),
   userId: text("user_id")
     .notNull()
     .references(() => usersTable.id, { onDelete: "cascade" }),
-  /** 'trial_reminder' | 'receipt' */
+  /** Logical message kind: 'trial_reminder' | 'receipt' | 'support_ack' | ... */
   kind: text("kind").notNull(),
-  /** 'pending' | 'sent' | 'failed' */
-  status: text("status").notNull().default("pending"),
+  /** Transport: 'email' | 'push' | 'log' (dev fallback / no transport configured). */
+  channel: text("channel").notNull(),
+  /** Stable template id, e.g. 'trial_reminder.v1' — useful for content audits. */
+  template: text("template"),
+  /** Email address or push token; null for channel='log'. */
+  recipient: text("recipient"),
+  /** 'sent' | 'failed' | 'logged' */
+  status: text("status").notNull(),
   payload: json("payload"),
+  /** Failure message when status='failed'; never include PII or secrets here. */
+  error: text("error"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   sentAt: timestamp("sent_at"),
 });

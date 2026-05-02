@@ -46,6 +46,16 @@ const envSchema = z.object({
 
   SUBSCRIPTION_TRIAL_DAYS: z.coerce.number().int().positive().default(7),
   SUBSCRIPTION_REMINDER_HOURS: z.coerce.number().int().positive().default(48),
+
+  // Notifications (Prompt 10). All optional; sendEmail / sendPush degrade to
+  // logging when the relevant transport isn't configured.
+  SMTP_HOST: z.string().optional(),
+  SMTP_PORT: z.coerce.number().int().positive().default(587),
+  SMTP_USER: z.string().optional(),
+  SMTP_PASS: z.string().optional(),
+  RESEND_API_KEY: z.string().optional(),
+  EXPO_ACCESS_TOKEN: z.string().optional(),
+  FROM_EMAIL: z.string().email().default("hello@neurofit.example"),
 });
 
 const result = envSchema.safeParse(process.env);

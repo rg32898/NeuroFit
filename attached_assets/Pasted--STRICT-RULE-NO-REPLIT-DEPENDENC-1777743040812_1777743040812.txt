@@ -1,0 +1,71 @@
+=================================================================
+STRICT RULE — NO REPLIT DEPENDENCIES OR REPLIT-SPECIFIC TOOLS
+=================================================================
+Expo is allowed (it is industry standard and not Replit-specific).
+DO NOT use Replit's mobile preview as the only test path — the
+app must run on Expo Go on a real device and on `npx expo start`
+on any laptop.
+=================================================================
+
+CONTEXT:
+Backend is feature-complete (Prompts 1–10). We now start the
+mobile app inside /apps/mobile.
+
+GOAL:
+Initialise an Expo (TypeScript) app with navigation, theme,
+React Query, Zustand, and an HTTP client wired to the backend.
+NO screens with logic yet — just the shell, theme, and one
+placeholder Home screen.
+
+DELIVERABLES:
+1. Initialise Expo into /apps/mobile:
+     pnpm create expo-app apps/mobile --template blank-typescript
+2. Move into apps/mobile and install:
+     - @react-navigation/native, @react-navigation/native-stack,
+       @react-navigation/bottom-tabs
+     - react-native-screens, react-native-safe-area-context
+     - @tanstack/react-query
+     - zustand
+     - zod
+     - expo-secure-store (for tokens)
+     - expo-localization, react-i18next, i18next
+     - @neurofit/shared (workspace dep)
+3. /apps/mobile/.env.example:
+     EXPO_PUBLIC_API_URL=http://localhost:4000
+4. /apps/mobile/src/lib/api.ts: typed fetch wrapper that:
+     - reads EXPO_PUBLIC_API_URL
+     - attaches Authorization: Bearer from secure-store
+     - on 401, attempts a refresh, retries once, otherwise
+       clears tokens and signals logout
+     - returns parsed JSON or throws a structured ApiError
+5. /apps/mobile/src/lib/auth-store.ts (Zustand): tokens, user,
+   login(), logout(), restoreFromStorage().
+6. /apps/mobile/src/theme/index.ts: a small design system —
+   colors, spacing, typography, radii, shadows. Light + dark.
+   No external UI kit (no NativeBase, no React Native Paper) —
+   we'll build small primitives ourselves.
+7. /apps/mobile/src/components/ui/{Button,Text,Card,Input,Screen}.tsx
+   — minimal styled primitives.
+8. /apps/mobile/src/navigation/RootNavigator.tsx:
+     - If unauthenticated → AuthStack (Welcome / Login / Register)
+     - If authenticated → TabNavigator (Today / Games / Progress / Settings)
+   Each tab shows a placeholder screen.
+9. App.tsx wires QueryClientProvider, navigation container, theme
+   provider, and bootstrap (restoreFromStorage on mount).
+10. Add Detox or Maestro? — skip for now; rely on RN Testing
+    Library for components.
+
+DO NOT:
+- Use Expo Router this round — we use @react-navigation/* so we
+  can drop Expo without rewiring nav if needed.
+- Hardcode the API URL.
+
+VERIFY:
+- `pnpm --filter mobile start` opens Expo dev tools.
+- App boots on Expo Go (or simulator), shows the placeholder
+  Welcome screen.
+- Toggling auth-store from devtools swaps to the tab navigator.
+
+OUTPUT:
+Folder tree of /apps/mobile/src and a screenshot description of
+the placeholder Welcome screen.

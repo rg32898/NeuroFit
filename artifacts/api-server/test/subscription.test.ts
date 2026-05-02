@@ -17,6 +17,9 @@ vi.mock("@workspace/db", () => ({
   subscriptionsTable: {},
   billingEventsTable: {},
   notificationsTable: {},
+  pushTokensTable: {},
+  contentReportsTable: {},
+  supportTicketsTable: {},
 }));
 
 vi.mock("../src/billing/billingRepo", () => ({
@@ -24,10 +27,14 @@ vi.mock("../src/billing/billingRepo", () => ({
   upsertSubscription: vi.fn(),
   markCancelAtPeriodEnd: vi.fn(),
   insertBillingEvent: vi.fn(),
-  createNotification: vi.fn(),
   findTrialingNeedingReminder: vi.fn(),
   markReminderSent: vi.fn(),
   findPaymentsNeedingReceipt: vi.fn(),
+}));
+
+vi.mock("../src/services/notifications/notificationsRepo", () => ({
+  logNotification: vi.fn(),
+  findPushTokensForUser: vi.fn(),
 }));
 
 vi.mock("../src/services/billing/apple", () => ({
@@ -58,6 +65,7 @@ import * as billingRepo from "../src/billing/billingRepo";
 import * as appleBilling from "../src/services/billing/apple";
 import * as stripeBilling from "../src/services/billing/stripe";
 import * as userRepo from "../src/auth/userRepo";
+import * as notificationsRepo from "../src/services/notifications/notificationsRepo";
 import type {
   BillingEvent,
   Notification,
@@ -166,21 +174,29 @@ beforeEach(() => {
     billingEvents.push(ev);
     return ev;
   });
-  vi.mocked(billingRepo.createNotification).mockImplementation(
-    async (userId, kind, payload) => {
+  vi.mocked(notificationsRepo.logNotification).mockImplementation(
+    async (input) => {
       const n: Notification = {
         id: crypto.randomUUID(),
-        userId,
-        kind,
-        status: "pending",
-        payload: payload as unknown as Notification["payload"],
+        userId: input.userId,
+        kind: input.kind,
+        channel: input.channel,
+        template: input.template ?? null,
+        recipient: input.recipient ?? null,
+        status: input.status,
+        payload: (input.payload ?? null) as unknown as Notification["payload"],
+        error: input.error ?? null,
         createdAt: new Date(),
-        sentAt: null,
+        sentAt:
+          input.status === "sent" || input.status === "logged"
+            ? new Date()
+            : null,
       };
       notifications.push(n);
       return n;
     },
   );
+  vi.mocked(notificationsRepo.findPushTokensForUser).mockResolvedValue([]);
   vi.mocked(billingRepo.findTrialingNeedingReminder).mockResolvedValue([]);
   vi.mocked(billingRepo.markReminderSent).mockResolvedValue(undefined);
   vi.mocked(billingRepo.findPaymentsNeedingReceipt).mockResolvedValue([]);

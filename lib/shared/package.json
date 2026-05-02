@@ -8,7 +8,9 @@
     "./profile": "./src/profile.ts",
     "./workout": "./src/workout.ts",
     "./streak": "./src/streak.ts",
-    "./subscription": "./src/subscription.ts"
+    "./subscription": "./src/subscription.ts",
+    "./reports": "./src/reports.ts",
+    "./support": "./src/support.ts"
   },
   "dependencies": {
     "zod": "catalog:"
