@@ -5,7 +5,8 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./profile": "./src/profile.ts"
+    "./profile": "./src/profile.ts",
+    "./workout": "./src/workout.ts"
   },
   "dependencies": {
     "zod": "catalog:"
