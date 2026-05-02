@@ -1,0 +1,63 @@
+=================================================================
+STRICT RULE — NO REPLIT DEPENDENCIES OR REPLIT-SPECIFIC TOOLS
+=================================================================
+Use only .env for config. No Replit-specific packages or storage.
+=================================================================
+
+CONTEXT:
+Workout endpoints exist (Prompt 7). The Streak and ProgressEvent
+models exist (Prompt 3) but the streak engine is not implemented.
+The requirements doc (FR-5.x) is the source of truth for behaviour.
+
+GOAL:
+Build a bulletproof streak system. This is the #1 retention
+driver and the #2 source of negative reviews when broken.
+
+DELIVERABLES:
+1. /apps/api/src/services/streakService.ts:
+     - recordCompletion(userId, isoDate)
+         · Idempotent on (userId, isoDate)
+         · If isoDate is today and lastActive is yesterday → +1
+         · If isoDate is today and lastActive >2 days ago →
+           consume one streak freeze if available; otherwise reset
+         · Updates Streak.current, .longest, .lastActiveDate
+     - useFreeze(userId): manual override for support tooling
+     - resetFreezesIfNewMonth(userId): top up to 2 on the 1st of
+       the month
+2. /apps/api/src/routes/progress.ts:
+     POST /progress/events           → batched ProgressEvent
+                                       intake, idempotent per
+                                       clientEventId. Triggers
+                                       streak update if any event
+                                       is GAME_COMPLETED.
+     GET  /progress/streak           → returns current streak,
+                                       longest, freezesAvailable,
+                                       freezesResetAt
+     POST /progress/restore-streak  → admin-only, requires a
+                                       supportToken header
+3. Cron-like trigger: implement as a route POST /admin/cron/daily
+   protected by a CRON_SECRET env var (so it can be called by
+   any host's scheduler — Render, Fly, GitHub Actions, cron-job.org).
+   It runs resetFreezesIfNewMonth for all users when the month
+   changes.
+4. Tests in /apps/api/test/streak.test.ts covering:
+     - 5 consecutive days = streak 5
+     - skip 1 day with 2 freezes available → streak survives,
+       freezesAvailable goes to 1
+     - skip 1 day with 0 freezes → streak resets
+     - same-day duplicate completion → no double-count
+     - clientEventId replay → no double-count
+5. Add to .env.example: CRON_SECRET=replace_me
+
+DO NOT:
+- Calculate streaks client-side or trust client timestamps.
+- Use last-write-wins on the Streak row — use a transaction.
+
+VERIFY:
+- All scenarios in the test list pass.
+- Posting the same {clientEventId} twice does not create a
+  second ProgressEvent.
+
+OUTPUT:
+Show the streak state machine in pseudocode, the routes, and
+test results.

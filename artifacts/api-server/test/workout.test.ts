@@ -38,11 +38,13 @@ vi.mock("../src/workout/workoutRepo", () => ({
   getDomainCountsLastNDays: vi.fn(),
   recordProgressEvent: vi.fn(),
   adjustProficiencyScore: vi.fn(),
-  getStreak: vi.fn(),
-  bumpStreak: vi.fn(),
   getUserTier: vi.fn(),
   listAllPublishedGames: vi.fn(),
   getGameById: vi.fn(),
+}));
+
+vi.mock("../src/services/streakService", () => ({
+  recordCompletion: vi.fn(),
 }));
 
 // ── Imports ──────────────────────────────────────────────────────────────────
@@ -52,6 +54,7 @@ import app from "../src/app";
 import * as userRepo from "../src/auth/userRepo";
 import * as profileRepo from "../src/profile/profileRepo";
 import * as workoutRepo from "../src/workout/workoutRepo";
+import * as streakService from "../src/services/streakService";
 import type { Game, ProgressEvent, WorkoutSession } from "@workspace/db";
 
 // ── Fixtures & in-memory state ───────────────────────────────────────────────
@@ -233,15 +236,17 @@ beforeEach(() => {
     },
   );
 
-  vi.mocked(workoutRepo.bumpStreak).mockImplementation(async (userId) => ({
-    userId,
-    current: 1,
-    longest: 1,
-    lastActiveDate: new Date(),
-    freezesAvailable: 2,
-    freezesResetAt: null,
-    updatedAt: new Date(),
-  }));
+  vi.mocked(streakService.recordCompletion).mockImplementation(
+    async (userId) => ({
+      userId,
+      current: 1,
+      longest: 1,
+      lastActiveDate: new Date(),
+      freezesAvailable: 2,
+      freezesResetAt: null,
+      updatedAt: new Date(),
+    }),
+  );
 
   vi.mocked(workoutRepo.getGameById).mockImplementation(
     async (id) => gameById(id),

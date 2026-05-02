@@ -20,7 +20,6 @@ import {
 } from "../services/workoutService";
 import {
   adjustProficiencyScore,
-  bumpStreak,
   createWorkoutSession,
   getDomainCountsLastNDays,
   getGameById,
@@ -33,6 +32,7 @@ import {
   recordProgressEvent,
 } from "../workout/workoutRepo";
 import { getProfileByUserId } from "../profile/profileRepo";
+import { recordCompletion } from "../services/streakService";
 
 const router = Router();
 
@@ -191,8 +191,8 @@ router.post(
       deltas.push({ domain, decision, delta, score });
     }
 
-    // 4. Update streak.
-    const streak = await bumpStreak(userId, new Date());
+    // 4. Update streak via the unified streak engine (FR-5.x).
+    const streak = await recordCompletion(userId, new Date());
 
     res.json({
       sessionId: session.id,

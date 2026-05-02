@@ -6,7 +6,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./profile": "./src/profile.ts",
-    "./workout": "./src/workout.ts"
+    "./workout": "./src/workout.ts",
+    "./streak": "./src/streak.ts"
   },
   "dependencies": {
     "zod": "catalog:"

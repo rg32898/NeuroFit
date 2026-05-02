@@ -3,12 +3,10 @@ import {
   gamesTable,
   proficiencyScoresTable,
   progressEventsTable,
-  streaksTable,
   subscriptionsTable,
   workoutSessionsTable,
   type Game,
   type ProgressEvent,
-  type Streak,
   type WorkoutSession,
 } from "@workspace/db";
 import { and, desc, eq, gte, sql } from "drizzle-orm";
@@ -218,65 +216,6 @@ export async function adjustProficiencyScore(
     .returning();
 
   return { score: updated?.score ?? 2000 };
-}
-
-export async function getStreak(userId: string): Promise<Streak | null> {
-  const [row] = await db
-    .select()
-    .from(streaksTable)
-    .where(eq(streaksTable.userId, userId));
-  return row ?? null;
-}
-
-export async function bumpStreak(
-  userId: string,
-  today: Date,
-): Promise<Streak> {
-  const existing = await getStreak(userId);
-  const startOfToday = new Date(
-    Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()),
-  );
-
-  let current = 1;
-  if (existing?.lastActiveDate) {
-    const last = new Date(existing.lastActiveDate);
-    const startOfLast = new Date(
-      Date.UTC(last.getUTCFullYear(), last.getUTCMonth(), last.getUTCDate()),
-    );
-    const diffDays = Math.round(
-      (startOfToday.getTime() - startOfLast.getTime()) / (24 * 60 * 60 * 1000),
-    );
-    if (diffDays === 0) {
-      current = existing.current; // already counted today
-    } else if (diffDays === 1) {
-      current = existing.current + 1;
-    } else {
-      current = 1; // streak broken
-    }
-  }
-
-  const longest = Math.max(current, existing?.longest ?? 0);
-
-  const [row] = await db
-    .insert(streaksTable)
-    .values({
-      userId,
-      current,
-      longest,
-      lastActiveDate: today,
-      updatedAt: new Date(),
-    })
-    .onConflictDoUpdate({
-      target: streaksTable.userId,
-      set: {
-        current,
-        longest,
-        lastActiveDate: today,
-        updatedAt: new Date(),
-      },
-    })
-    .returning();
-  return row!;
 }
 
 export async function getUserTier(userId: string): Promise<Tier> {
