@@ -1,0 +1,121 @@
+=================================================================
+STRICT RULE — NO REPLIT DEPENDENCIES OR REPLIT-SPECIFIC TOOLS
+=================================================================
+DO NOT use Replit DB, Replit Auth, Replit Secrets, Replit Object
+Storage, @replit/* packages, or any Replit-only env vars or files
+as the source of truth. Use .env files for all secrets. All code
+must run unmodified on any Node.js host.
+=================================================================
+
+GOAL:
+Create a clean monorepo for the NeuroFit brain-training app with
+pnpm workspaces. This is the foundation for everything that
+follows.
+
+DELIVERABLES:
+1. Root package.json with pnpm workspaces configured.
+2. pnpm-workspace.yaml listing: apps/*, packages/*.
+3. Folder structure:
+     /apps/api/         (backend - to be filled later)
+     /apps/mobile/      (React Native - to be filled later)
+     /apps/admin/       (Next.js - to be filled later)
+     /packages/shared/  (shared types/zod schemas)
+4. /packages/shared/ initialised with package.json, tsconfig.json,
+   src/index.ts that exports a placeholder type `User`.
+5. Root tsconfig.base.json with strict mode and path aliases for
+   @neurofit/shared.
+6. Root .gitignore covering node_modules, dist, .env, .env.local,
+   .expo, .next, build artifacts, OS files.
+7. Root .env.example (empty, ready for later prompts to add to).
+8. Root README.md with sections: Overview, Stack, Prerequisites
+   (Node 20, pnpm 9, Postgres), Getting Started (placeholder),
+   Project structure, Environment variables.
+9. .editorconfig and .nvmrc (specifying Node 20).
+
+DO NOT:
+- Create any .replit, replit.nix or replit-specific config
+- Install any @replit/* package
+- Add any backend, mobile, or admin code yet — just scaffold
+
+VERIFY before completing:
+- `pnpm install` runs cleanly at the repo root
+- `pnpm -r run --if-present build` succeeds (it will be a no-op)
+- The folder structure exists exactly as listed above
+- Git is initialised, .gitignore is committed, .env is ignored
+
+OUTPUT:
+Print the final folder tree and confirm `pnpm install` succeeded.
+=================================================================
+STRICT RULE — NO REPLIT DEPENDENCIES OR REPLIT-SPECIFIC TOOLS
+=================================================================
+DO NOT use Replit DB, Replit Auth, Replit Secrets, Replit Object
+Storage, @replit/* packages, or Replit-only env vars or files.
+Use .env files for all secrets. Code must run on any Node host.
+=================================================================
+
+CONTEXT:
+The monorepo from Prompt 1 already exists. Folders /apps/api,
+/apps/mobile, /apps/admin, /packages/shared are scaffolded but
+mostly empty. Verify by listing /apps/api before you start.
+
+GOAL:
+Build a production-grade Express + TypeScript backend skeleton
+inside /apps/api with structured logging, validation, error
+handling, health checks, and a config loader. NO database
+or business endpoints yet — that comes in later prompts.
+
+DELIVERABLES:
+1. /apps/api/package.json with these deps:
+   - express, cors, helmet, compression
+   - pino, pino-http, pino-pretty (dev only)
+   - zod
+   - dotenv
+   - dev: typescript, tsx, @types/express, @types/node, vitest
+2. /apps/api/tsconfig.json extending root tsconfig.base.json.
+3. /apps/api/.env.example with:
+     PORT=4000
+     NODE_ENV=development
+     LOG_LEVEL=info
+     CORS_ORIGIN=http://localhost:3000
+4. /apps/api/src/config.ts that loads .env via dotenv and parses
+   it with a Zod schema. Throws clearly if a required var is
+   missing. Exports a typed `config` object.
+5. /apps/api/src/logger.ts that exports a pino logger configured
+   for structured JSON in production and pretty in dev.
+6. /apps/api/src/middleware/error.ts — central async error handler
+   that turns thrown errors into JSON responses with a request id.
+7. /apps/api/src/middleware/requestId.ts — adds an x-request-id
+   header to every request and exposes it on req.id.
+8. /apps/api/src/routes/health.ts — GET /health returns
+   { status: "ok", uptime, version }.
+9. /apps/api/src/server.ts — wires Express app:
+     - helmet, cors with allow-list from config, compression
+     - pino-http with the request id
+     - JSON body parser (limit 1mb)
+     - mount /health
+     - error handler last
+     - listen on PORT
+10. /apps/api/src/app.ts — exports the Express app (separate from
+    server.ts so it's testable).
+11. /apps/api/test/health.test.ts — vitest test using supertest
+    that asserts GET /health returns 200 and { status: "ok" }.
+12. Scripts in /apps/api/package.json:
+      "dev": "tsx watch src/server.ts"
+      "build": "tsc"
+      "start": "node dist/server.js"
+      "test": "vitest run"
+
+DO NOT:
+- Add any database code, ORM, or Prisma yet (next prompt)
+- Add any auth, user, or business routes yet
+- Hardcode any secrets — everything via process.env via config.ts
+
+VERIFY:
+- `pnpm --filter api dev` starts on PORT
+- `curl http://localhost:4000/health` returns 200 JSON
+- `pnpm --filter api test` passes
+- `pnpm --filter api build` produces /apps/api/dist/server.js
+
+OUTPUT:
+Show the final /apps/api folder tree and the curl response
+from /health.

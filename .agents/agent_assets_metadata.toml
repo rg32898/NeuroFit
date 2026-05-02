@@ -1,0 +1,8 @@
+uploads = []
+outputs = []
+
+[[generated]]
+id = "gcuLmxj46s5Ha-GSlaX2G"
+uri = "file://artifacts/mobile/assets/images/icon.png"
+type = "image"
+title = "neurofit brain app icon"
