@@ -15,10 +15,16 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { AppProvider } from "@/context/AppContext";
+import { useAuthStore } from "@app/lib/auth-store";
+import { initI18n } from "@app/i18n";
 
 SplashScreen.preventAutoHideAsync();
 
 const queryClient = new QueryClient();
+
+// Fire-and-forget bootstrap. Done at module scope so i18n is ready before
+// the first screen renders. The promise resolves quickly (no network).
+const i18nReady = initI18n();
 
 function RootLayoutNav() {
   return (
@@ -42,13 +48,30 @@ export default function RootLayout() {
     Inter_700Bold,
   });
 
+  const restoreFromStorage = useAuthStore((s) => s.restoreFromStorage);
+  const hydrated = useAuthStore((s) => s.hydrated);
+  const [i18nLoaded, setI18nLoaded] = React.useState(false);
+
   useEffect(() => {
-    if (fontsLoaded || fontError) {
+    void restoreFromStorage();
+    // Fail-open: even if i18n init throws (rare — network-free, in-memory),
+    // we must not deadlock the splash gate. We log and continue with whatever
+    // i18next has loaded (its fallback chain still resolves keys to the key
+    // string, which is preferable to a blank app forever).
+    i18nReady
+      .catch((err) => {
+        console.warn("i18n.init.failed", err);
+      })
+      .finally(() => setI18nLoaded(true));
+  }, [restoreFromStorage]);
+
+  useEffect(() => {
+    if ((fontsLoaded || fontError) && hydrated && i18nLoaded) {
       SplashScreen.hideAsync();
     }
-  }, [fontsLoaded, fontError]);
+  }, [fontsLoaded, fontError, hydrated, i18nLoaded]);
 
-  if (!fontsLoaded && !fontError) return null;
+  if ((!fontsLoaded && !fontError) || !hydrated || !i18nLoaded) return null;
 
   return (
     <SafeAreaProvider>

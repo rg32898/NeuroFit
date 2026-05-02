@@ -6,6 +6,9 @@
     "paths": {
       "@/*": [
         "./*"
+      ],
+      "@app/*": [
+        "./src/*"
       ]
     }
   },
@@ -18,6 +21,9 @@
   "references": [
     {
       "path": "../../lib/api-client-react"
+    },
+    {
+      "path": "../../lib/shared"
     }
   ]
 }
