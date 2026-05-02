@@ -1,0 +1,50 @@
+=================================================================
+STRICT RULE — NO REPLIT DEPENDENCIES OR REPLIT-SPECIFIC TOOLS
+=================================================================
+Use only .env for config. No Replit-specific packages or storage.
+=================================================================
+
+CONTEXT:
+Auth is working (Prompt 4). /auth/me returns the user. Profile
+model exists in schema (Prompt 3) but has no endpoints yet.
+
+GOAL:
+Add the onboarding and profile endpoints. The mobile app's first
+launch flow will use these.
+
+DELIVERABLES:
+1. /apps/api/src/routes/profile.ts:
+     GET  /profile                 → current user's profile
+     PATCH /profile                 → updates displayName, birthYear,
+                                      focusDomain, relaxedMode,
+                                      timerScale (Zod-validated)
+     POST /profile/assessment      → accepts assessment answers,
+                                      computes initial proficiency
+                                      scores per domain (seeds
+                                      ProficiencyScore rows), and
+                                      returns the seeded scores
+2. /apps/api/src/services/assessmentService.ts — pure function
+   that takes assessment answers (5 domains, ~3 questions each)
+   and returns a starting score per domain in 0..5000.
+3. Validation schemas live in /packages/shared/src/profile.ts so
+   the mobile app reuses them. Export inferred TS types.
+4. Unit tests for assessmentService covering edge cases:
+     - all-correct answers → high but not max scores
+     - all-wrong answers → low but not zero scores
+     - skipped assessment → middling defaults
+5. Integration test: register → /profile/assessment → /profile
+   reflects scores.
+
+DO NOT:
+- Make the assessment mandatory. The mobile app must be able to
+  skip it (FR-1.4 in the requirements doc).
+- Allow setting proficiency scores directly via the API.
+
+VERIFY:
+- `curl PATCH /profile` updates the row.
+- `curl POST /profile/assessment` creates exactly 6
+  ProficiencyScore rows (one per domain).
+- All tests pass.
+
+OUTPUT:
+Show the new routes, sample bodies, and test results.
