@@ -1,0 +1,54 @@
+=================================================================
+STRICT RULE — NO REPLIT DEPENDENCIES OR REPLIT-SPECIFIC TOOLS
+=================================================================
+Use only .env for config. No Replit-specific packages or storage.
+=================================================================
+
+CONTEXT:
+We have games and items seeded (Prompt 3) and auth + profile
+working (Prompts 4–5). No catalogue endpoints yet.
+
+GOAL:
+Public/authenticated catalogue endpoints used by the mobile app
+to render the game library and load individual items. No admin
+authoring routes here — those live in Prompt 18.
+
+DELIVERABLES:
+1. /apps/api/src/routes/catalogue.ts:
+     GET  /games                   → list published games (filter
+                                      by domain, isFreeTier).
+                                      Authenticated.
+     GET  /games/:slug              → game detail.
+     GET  /games/:slug/items       → returns N=10 items at the
+                                      user's current proficiency
+                                      band (±1), excluding items
+                                      served to this user in the
+                                      last 30 days.
+2. /apps/api/src/services/catalogueService.ts implementing the
+   item-selection rules. Pure functions, easy to unit test.
+3. Free-tier rotation: a server-side rule that marks a rotating
+   set of paid games as temporarily free (FR-4.3). Implement as
+   a function `isGameFreeForUser(user, game, today)` — initially
+   based on a deterministic hash of (game.id, ISO week) so 30%
+   of paid games are free each week.
+4. Unit tests for the rotation function: same input → same output;
+   exactly ~30% of paid games are free in any week.
+5. Integration tests:
+     - /games returns only published games
+     - /games/:slug/items respects difficulty band and 30-day
+       de-dupe (use a fixture that pre-inserts ProgressEvents)
+
+DO NOT:
+- Return unpublished items or unpublished games to clients.
+- Embed solutions/answers visibly in responses unless the game
+  type requires them (e.g., self-graded). Default: keep answer
+  keys server-side.
+
+VERIFY:
+- `curl /games` returns the 6 seeded games.
+- Two consecutive requests for /games/:slug/items return
+  non-overlapping sets when the first completion is recorded.
+- All tests pass.
+
+OUTPUT:
+Show the catalogue endpoints and a sample /games response.
