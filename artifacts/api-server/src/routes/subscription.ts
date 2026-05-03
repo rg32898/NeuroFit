@@ -4,9 +4,10 @@ import {
   validateReceiptSchema,
 } from "@workspace/shared/subscription";
 import { requireAuth } from "../middlewares/requireAuth";
-import { getSubscription } from "../billing/billingRepo";
+import { getSubscription, insertBillingEvent } from "../billing/billingRepo";
 import { validateAndSync } from "../services/billing";
 import { cancelSubscription } from "../services/billingService";
+import { computeRefundEligibility } from "../services/refundService";
 
 const router = Router();
 
@@ -135,5 +136,66 @@ router.post("/cancel", requireAuth, async (req: Request, res: Response) => {
     endsOn: sub.currentPeriodEnd,
   });
 });
+
+/**
+ * GET /subscription/refund-eligibility — FR-6.7. Returns whether the user
+ * is within the 14-day refund window plus provider-specific instructions
+ * the client can render.
+ */
+router.get(
+  "/refund-eligibility",
+  requireAuth,
+  async (req: Request, res: Response) => {
+    const sub = await getSubscription(req.user!.id);
+    res.json(computeRefundEligibility(sub));
+  },
+);
+
+/**
+ * POST /subscription/refund-request — FR-6.7. Records the user's refund
+ * intent in the billing audit log. For IAP (apple/google) the actual
+ * refund is processed by the store via the URL we surface on eligibility;
+ * for stripe we record the intent and a human/cron picks it up.
+ */
+router.post(
+  "/refund-request",
+  requireAuth,
+  async (req: Request, res: Response) => {
+    const sub = await getSubscription(req.user!.id);
+    const eligibility = computeRefundEligibility(sub);
+    if (!eligibility.eligible) {
+      res.status(400).json({
+        error: {
+          code: eligibility.reason ?? "REFUND_INELIGIBLE",
+          message:
+            eligibility.reason === "WINDOW_EXPIRED"
+              ? `Refund window of ${eligibility.windowDays} days has expired`
+              : "No paid subscription eligible for refund",
+          requestId: reqId(req),
+        },
+        eligibility,
+      });
+      return;
+    }
+
+    await insertBillingEvent({
+      userId: req.user!.id,
+      provider: eligibility.provider as "apple" | "google" | "stripe" | "none",
+      eventType: "refund_requested",
+      providerEventId: null,
+      status: sub?.status ?? "active",
+      payload: {
+        plan: sub?.plan ?? null,
+        lastChargeAt: eligibility.lastChargeAt,
+        daysRemaining: eligibility.daysRemaining,
+      },
+    });
+
+    res.json({
+      requested: true,
+      eligibility,
+    });
+  },
+);
 
 export default router;

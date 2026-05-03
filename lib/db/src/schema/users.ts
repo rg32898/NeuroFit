@@ -9,6 +9,13 @@ export const usersTable = pgTable("users", {
   tokenVersion: integer("token_version").default(0).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   deletedAt: timestamp("deleted_at"),
+  /**
+   * FR-6.x trust layer — when set, the account is in the 14-day reverse
+   * window. The daily cron purges (sets `deletedAt`) once the window
+   * elapses; users can call POST /auth/undo-delete to clear this column
+   * and keep their account.
+   */
+  deletionScheduledAt: timestamp("deletion_scheduled_at"),
 });
 
 export type InsertUser = typeof usersTable.$inferInsert;

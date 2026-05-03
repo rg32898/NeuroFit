@@ -4,10 +4,13 @@ import { z } from "zod";
 import { comparePassword, hashPassword } from "../auth/passwords";
 import { signAccessToken, signRefreshToken, verifyRefresh } from "../auth/tokens";
 import {
+  cancelDeletion,
   createUser,
   findUserByEmail,
   findUserById,
+  getDeletionStatus,
   incrementTokenVersion,
+  scheduleDeletion,
 } from "../auth/userRepo";
 import { requireAuth } from "../middlewares/requireAuth";
 
@@ -170,6 +173,45 @@ router.post("/google", (_req: Request, res: Response) => {
       requestId: null,
     },
   });
+});
+
+/**
+ * POST /auth/delete-me — schedule account deletion. FR-6.x trust layer:
+ * the user gets a 14-day "undo" window during which they can call
+ * /auth/undo-delete to keep their account. After the window the daily
+ * cron purges the row.
+ */
+router.post("/delete-me", requireAuth, async (req: Request, res: Response) => {
+  const result = await scheduleDeletion(req.user!.id);
+  if (!result) {
+    authError(res, 404, "USER_NOT_FOUND", "User not found", reqId(req));
+    return;
+  }
+  // Revoke refresh tokens so other devices are signed out immediately.
+  await incrementTokenVersion(req.user!.id);
+  res.json({
+    scheduledAt: result.scheduledAt,
+    purgeAt: result.purgeAt,
+    reverseWindowDays: 14,
+  });
+});
+
+/**
+ * POST /auth/undo-delete — clear the deletion window within 14 days.
+ * Requires the user to sign back in (token-version was bumped).
+ */
+router.post("/undo-delete", requireAuth, async (req: Request, res: Response) => {
+  const ok = await cancelDeletion(req.user!.id);
+  if (!ok) {
+    authError(res, 404, "USER_NOT_FOUND", "User not found", reqId(req));
+    return;
+  }
+  res.json({ restored: true });
+});
+
+router.get("/deletion-status", requireAuth, async (req: Request, res: Response) => {
+  const status = await getDeletionStatus(req.user!.id);
+  res.json(status);
 });
 
 router.get("/me", requireAuth, async (req: Request, res: Response) => {
