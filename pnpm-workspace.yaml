@@ -52,6 +52,10 @@ onlyBuiltDependencies:
   - unrs-resolver
 
 overrides:
+  # Pin a single @types/react version across the workspace so Radix/RN
+  # components don't mix incompatible ReactNode types (see task-4).
+  '@types/react': ~19.1.10
+  '@types/react-dom': ~19.1.7
   # Security vulnerability fixes
   '@tootallnate/once': 3.0.1
   'brace-expansion@2': 2.1.0
