@@ -1,5 +1,6 @@
 import { Router, type IRouter } from "express";
 import adminRouter from "./admin";
+import adminConsoleRouter from "./adminConsole";
 import authRouter from "./auth";
 import catalogueRouter from "./catalogue";
 import healthRouter from "./health";
@@ -23,6 +24,7 @@ router.use("/reports", reportsRouter);
 router.use("/support", supportRouter);
 router.use("/webhooks", webhooksRouter);
 router.use("/admin", adminRouter);
+router.use("/admin", adminConsoleRouter);
 router.use(catalogueRouter);
 
 export default router;

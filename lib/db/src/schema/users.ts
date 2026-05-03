@@ -7,6 +7,12 @@ export const usersTable = pgTable("users", {
   appleSub: text("apple_sub").unique(),
   googleSub: text("google_sub").unique(),
   tokenVersion: integer("token_version").default(0).notNull(),
+  /**
+   * FR-12.x admin console role. One of: "user" | "author" | "reviewer" | "admin".
+   * Stored as plain text so we can extend the ladder later without a migration
+   * dance. requireRole() in the api-server enforces a numeric hierarchy.
+   */
+  role: text("role").default("user").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   deletedAt: timestamp("deleted_at"),
   /**

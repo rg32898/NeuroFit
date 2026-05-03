@@ -11,7 +11,8 @@
     "./subscription": "./src/subscription.ts",
     "./reports": "./src/reports.ts",
     "./support": "./src/support.ts",
-    "./achievements": "./src/achievements.ts"
+    "./achievements": "./src/achievements.ts",
+    "./admin": "./src/admin.ts"
   },
   "dependencies": {
     "zod": "catalog:"

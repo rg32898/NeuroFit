@@ -1,0 +1,62 @@
+=================================================================
+STRICT RULE — NO REPLIT DEPENDENCIES OR REPLIT-SPECIFIC TOOLS
+=================================================================
+Use Next.js 14 (app router). NO Vercel-specific features baked
+into the runtime (we want it self-hostable). Use NextAuth-free
+JWT auth that talks to the same /apps/api as the mobile app.
+=================================================================
+
+CONTEXT:
+Backend exposes auth, catalogue, reports endpoints (Prompts 4–10).
+We now need an admin-facing tool inside /apps/admin for the
+editorial team.
+
+GOAL:
+Stand up a minimal but functional admin web app. Three primary
+flows: log in, author/edit/publish game items, triage content
+reports.
+
+DELIVERABLES:
+1. Initialise Next.js 14 app router into /apps/admin:
+     pnpm create next-app apps/admin --ts --tailwind --eslint
+       --app --src-dir --import-alias "@/*"
+2. Add /apps/admin/.env.example:
+     NEXT_PUBLIC_API_URL=http://localhost:4000
+3. /apps/admin/src/lib/api.ts — same fetch wrapper pattern as
+   mobile, using HttpOnly cookies for the access token (set via
+   a /api/auth/set-cookie route on this app that calls the
+   backend on the user's behalf).
+4. Backend additions in /apps/api:
+     - Add `role` to User: "user" | "author" | "reviewer" | "admin"
+     - /admin/games (CRUD) — gated to author+
+     - /admin/items (CRUD with publish toggle) — author drafts,
+       reviewer publishes
+     - /admin/reports (queue) — list, claim, resolve
+     - /admin/items/:id/hot-patch — replaces an item without
+       app-store update (FR-12.3)
+5. Admin pages (app router):
+     /(auth)/login
+     /games            — table of games + Create
+     /games/[id]       — list of items, draft/published filters
+     /items/new
+     /items/[id]/edit  — form with versioning UI
+     /reports          — kanban-ish queue (open / triaged / resolved)
+     /audit            — read-only feed of admin actions
+6. Every publish action requires reviewer role (FR-12.2). Every
+   action is logged to a new `AuditLog` Prisma model.
+7. Tests (Playwright optional; Vitest unit tests required):
+     - non-admin token cannot reach /admin/* routes
+     - draft → review → publish is the only path to live
+
+DO NOT:
+- Reuse the mobile app's tokens directly in the browser. Use
+  HttpOnly cookies set by the admin app's BFF route.
+- Allow AI drafts to publish without a human reviewer (FR-12.6).
+
+VERIFY:
+- A reviewer can hot-patch a reported item and the change is
+  live in mobile within one app refresh.
+- A non-reviewer attempting to publish gets 403.
+
+OUTPUT:
+Screen list, the new Prisma fields, and the /admin route table.

@@ -25,6 +25,14 @@ export const contentReportsTable = pgTable(
     category: text("category").notNull(),
     message: text("message").notNull(),
     status: text("status").default("open").notNull(),
+    /**
+     * FR-12.4 — reviewer who claimed this report. NULL until claim.
+     * Cleared (or kept as resolver) when status flips to resolved/dismissed.
+     */
+    claimedById: text("claimed_by_id").references(() => usersTable.id),
+    claimedAt: timestamp("claimed_at"),
+    resolvedAt: timestamp("resolved_at"),
+    resolutionNote: text("resolution_note"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (t) => ({
