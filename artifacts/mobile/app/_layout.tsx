@@ -39,7 +39,10 @@ function RootLayoutNav() {
     >
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="onboarding" options={{ headerShown: false }} />
-      <Stack.Screen name="game" options={{ headerShown: false }} />
+      <Stack.Screen name="game/memory" options={{ headerShown: false }} />
+      <Stack.Screen name="game/pattern" options={{ headerShown: false }} />
+      <Stack.Screen name="game/reaction" options={{ headerShown: false }} />
+      <Stack.Screen name="game/sequence" options={{ headerShown: false }} />
       <Stack.Screen name="workout" options={{ headerShown: false }} />
       <Stack.Screen name="settings" options={{ headerShown: true }} />
       <Stack.Screen name="subscription" options={{ headerShown: true }} />
