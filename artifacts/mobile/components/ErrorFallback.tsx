@@ -129,9 +129,9 @@ export function ErrorFallback({ error, resetError }: ErrorFallbackProps) {
                 styles.inlineErrorStack,
                 { color: colors.mutedForeground, fontFamily: monoFont },
               ]}
-              numberOfLines={3}
+              numberOfLines={10}
             >
-              {error.stack.split("\n").slice(1, 4).join("\n")}
+              {error.stack.split("\n").slice(1, 11).join("\n")}
             </Text>
           ) : null}
         </View>
