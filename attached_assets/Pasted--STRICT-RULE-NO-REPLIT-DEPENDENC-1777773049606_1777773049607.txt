@@ -1,0 +1,68 @@
+=================================================================
+STRICT RULE — NO REPLIT DEPENDENCIES OR REPLIT-SPECIFIC TOOLS
+=================================================================
+Use only .env for config. No Replit-specific packages or storage.
+This screen exists specifically to embody the trust-layer
+requirements — read FR-6.x in the requirements doc carefully.
+=================================================================
+
+CONTEXT:
+Backend subscription endpoints exist (Prompt 9). Mobile app has
+no settings screens yet.
+
+GOAL:
+Build the settings tab and — most importantly — the subscription
+screens that deliberately undo the dark patterns that get Elevate
+1-starred.
+
+DELIVERABLES:
+1. /apps/mobile/src/screens/settings/SettingsScreen.tsx:
+     - Account (email, sign out, delete account)
+     - Subscription (status + manage)
+     - Preferences (relaxed mode, timer scale, notifications)
+     - Accessibility (font scale, high contrast, colourblind palette)
+     - Help & Support → opens /support
+     - Legal (Privacy, Terms)
+2. /apps/mobile/src/screens/subscription/PlansScreen.tsx:
+     - Single screen with monthly, annual, family
+     - Each plan card shows: full price, billing period, equivalent
+       per-month for annual (FR-6.1), trial duration, "cancel
+       anytime" (FR-6.5 hint)
+     - DEFAULT selection is monthly (FR-6.2) — the cheaper option
+     - Below CTA: a sticky "Continue with free version" link
+3. SubscriptionStatusScreen.tsx — for current subscribers:
+     - Plan, current period end, exact next charge amount + date
+     - Big visible "Cancel subscription" button
+     - On cancel: confirms next end date, sends email, no
+       counter-offer dark pattern (FR-6.5, FR-6.6)
+     - "Get a refund" (FR-6.7) for charges within 14 days, opens
+       a self-service flow
+4. AccountDeletionScreen — irreversible deletion with a 14-day
+   reverse window. Uses /auth/delete-me (add this endpoint to
+   backend if missing).
+5. NotificationsScreen:
+     - Daily reminder time picker
+     - Marketing toggle (default OFF, FR-8.4)
+     - Quiet hours
+     - Single master toggle (FR-8.3)
+6. AccessibilityScreen — toggles wired to a settings store.
+7. Tests:
+     - Cancel button is visible and reachable in <= 2 taps from
+       the SettingsScreen
+     - Plans screen never auto-selects annual on first render
+     - Marketing toggle starts off
+
+DO NOT:
+- Add any "Are you sure?" interstitials that try to talk the
+  user out of cancelling beyond ONE confirm dialog.
+- Show a "50% off" promo when the user opens cancel (FR-6.11).
+- Change the price displayed on the plans screen mid-render.
+
+VERIFY:
+- Cancel flow takes ≤ 2 taps after opening Settings.
+- All plan cards render currency, period, and trial-days.
+- Marketing notifications are off by default.
+
+OUTPUT:
+Screenshot description of the cancel flow + the trust-layer
+requirements you implemented (mapped to FR-IDs).

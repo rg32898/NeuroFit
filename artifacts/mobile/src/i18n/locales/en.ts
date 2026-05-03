@@ -129,6 +129,31 @@ export const en = {
     errorTitle: "Couldn't load today's workout",
     errorBody: "Check your connection and try again.",
   },
+  progress: {
+    title: "Progress",
+    subtitle: "Your brain over time",
+    last30Days: "Last 30 days",
+    gamesSuffix: "games",
+    errorTitle: "Couldn't load your stats",
+    errorBody: "Check your connection and try again.",
+    retry: "Try again",
+    streak: {
+      current: "Current streak",
+      longest: "Longest",
+      freezes: "Freezes",
+    },
+    proficiency: {
+      title: "Proficiency",
+    },
+    totals: {
+      workouts: "Workouts",
+      games: "Games",
+    },
+    achievements: {
+      title: "Achievements",
+      empty: "No achievements unlocked yet — start a workout to begin.",
+    },
+  },
   runner: {
     title: "Workout in progress",
     progress: "Game {{current}} of {{total}}",

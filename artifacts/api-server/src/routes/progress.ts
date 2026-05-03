@@ -12,6 +12,7 @@ import {
   recordCompletion,
   restoreStreak,
 } from "../services/streakService";
+import { getProgressSummary } from "../services/progressSummaryService";
 
 const router = Router();
 
@@ -94,6 +95,18 @@ router.post("/events", requireAuth, async (req: Request, res: Response) => {
         }
       : null,
   });
+});
+
+/**
+ * GET /progress/summary — one-shot dashboard payload for the Progress tab.
+ *
+ * Aggregates streak, proficiency-by-domain (with band labels), 30-day
+ * game-completion timeline, lifetime totals, and the unlocked achievement
+ * list (computed server-side from the pure catalogue in @workspace/shared).
+ */
+router.get("/summary", requireAuth, async (req: Request, res: Response) => {
+  const summary = await getProgressSummary(req.user!.id);
+  res.json(summary);
 });
 
 /** GET /progress/streak — current state for the authenticated user. */

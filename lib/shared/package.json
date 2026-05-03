@@ -10,7 +10,8 @@
     "./streak": "./src/streak.ts",
     "./subscription": "./src/subscription.ts",
     "./reports": "./src/reports.ts",
-    "./support": "./src/support.ts"
+    "./support": "./src/support.ts",
+    "./achievements": "./src/achievements.ts"
   },
   "dependencies": {
     "zod": "catalog:"
