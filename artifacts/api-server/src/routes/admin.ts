@@ -34,8 +34,8 @@ function checkCronSecret(req: Request, res: Response): boolean {
  *
  * Designed to be invoked by ANY external scheduler — Render cron, Fly
  * machines, GitHub Actions, cron-job.org, plain crontab, etc. Auth is a
- * shared CRON_SECRET sent in the `x-cron-secret` header so we don't depend
- * on Replit's scheduler.
+ * shared CRON_SECRET sent in the `x-cron-secret` header so the endpoint
+ * is host-agnostic.
  *
  * Idempotent: each per-user freeze reset is a no-op once it has run for the
  * current calendar month.

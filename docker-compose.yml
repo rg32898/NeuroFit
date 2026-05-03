@@ -1,0 +1,92 @@
+# NeuroFit — local + self-hosted compose stack.
+#
+# Brings up Postgres, the Express API, and the Next.js admin console. The
+# Expo mobile app is intentionally NOT containerised — see README "Mobile"
+# section for the EAS build path.
+#
+# Usage:
+#   docker compose up -d postgres            # just the database
+#   docker compose up --build                # full stack
+#   docker compose down -v                   # tear down + wipe volume
+#
+# Environment is read from the root .env file (copy from .env.example).
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-neurofit}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-neurofit}
+      POSTGRES_DB: ${POSTGRES_DB:-neurofit}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-neurofit} -d ${POSTGRES_DB:-neurofit}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: artifacts/api-server/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 8080
+      DATABASE_URL: postgresql://${POSTGRES_USER:-neurofit}:${POSTGRES_PASSWORD:-neurofit}@postgres:5432/${POSTGRES_DB:-neurofit}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3100}
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
+      JWT_ACCESS_TTL: ${JWT_ACCESS_TTL:-15m}
+      JWT_REFRESH_TTL: ${JWT_REFRESH_TTL:-30d}
+      CRON_SECRET: ${CRON_SECRET}
+      SUPPORT_TOKEN: ${SUPPORT_TOKEN}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      APPLE_SHARED_SECRET: ${APPLE_SHARED_SECRET:-}
+      GOOGLE_PLAY_SERVICE_ACCOUNT_JSON: ${GOOGLE_PLAY_SERVICE_ACCOUNT_JSON:-}
+      GOOGLE_PLAY_PACKAGE_NAME: ${GOOGLE_PLAY_PACKAGE_NAME:-}
+      SUBSCRIPTION_TRIAL_DAYS: ${SUBSCRIPTION_TRIAL_DAYS:-7}
+      SUBSCRIPTION_REMINDER_HOURS: ${SUBSCRIPTION_REMINDER_HOURS:-48}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      EXPO_ACCESS_TOKEN: ${EXPO_ACCESS_TOKEN:-}
+      FROM_EMAIL: ${FROM_EMAIL:-hello@neurofit.example}
+      APPLE_CLIENT_ID: ${APPLE_CLIENT_ID:-}
+      APPLE_TEAM_ID: ${APPLE_TEAM_ID:-}
+      APPLE_KEY_ID: ${APPLE_KEY_ID:-}
+      APPLE_PRIVATE_KEY: ${APPLE_PRIVATE_KEY:-}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+    ports:
+      - "8080:8080"
+
+  admin:
+    build:
+      context: .
+      dockerfile: artifacts/admin/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - api
+    environment:
+      NODE_ENV: production
+      PORT: 3100
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8080}
+      ADMIN_API_INTERNAL_URL: http://api:8080
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+    ports:
+      - "3100:3100"
+
+volumes:
+  postgres_data:

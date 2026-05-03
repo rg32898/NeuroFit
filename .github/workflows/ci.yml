@@ -1,0 +1,101 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Build deterministically; install only what the lockfile says.
+  CI: "true"
+
+jobs:
+  api:
+    name: api-server (typecheck + tests)
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: neurofit
+          POSTGRES_PASSWORD: neurofit
+          POSTGRES_DB: neurofit
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U neurofit -d neurofit"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://neurofit:neurofit@localhost:5432/neurofit
+      JWT_ACCESS_SECRET: ci_access_secret_value_for_test_runs_only
+      JWT_REFRESH_SECRET: ci_refresh_secret_value_for_test_runs_only
+      CRON_SECRET: ci_cron_secret
+      SUPPORT_TOKEN: ci_support_token
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with: { version: 9 }
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Build composite libs
+        run: pnpm run typecheck:libs
+
+      - name: Migrate DB
+        run: pnpm --filter @workspace/api-server run db:migrate
+
+      - name: Typecheck api-server
+        run: pnpm --filter @workspace/api-server run typecheck
+
+      - name: Test api-server
+        run: pnpm --filter @workspace/api-server run test
+
+  admin:
+    name: admin (typecheck + tests)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 9 }
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run typecheck:libs
+      - run: pnpm --filter @workspace/admin run typecheck
+      - run: pnpm --filter @workspace/admin run test
+
+  mobile:
+    name: mobile (typecheck + jest)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 9 }
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run typecheck:libs
+      - run: pnpm --filter @workspace/mobile run typecheck
+      # NB: we deliberately do NOT run an Expo build in CI — EAS handles the
+      # native build pipeline on demand, and a CI-side native build would add
+      # 10+ minutes to every PR for no signal.
+      - run: pnpm --filter @workspace/mobile run test

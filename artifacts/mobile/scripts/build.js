@@ -55,20 +55,23 @@ function stripProtocol(domain) {
 }
 
 function getDeploymentDomain() {
-  if (process.env.REPLIT_INTERNAL_APP_DOMAIN) {
-    return stripProtocol(process.env.REPLIT_INTERNAL_APP_DOMAIN);
-  }
-
-  if (process.env.REPLIT_DEV_DOMAIN) {
-    return stripProtocol(process.env.REPLIT_DEV_DOMAIN);
-  }
-
+  // Primary: explicit, host-agnostic env var anyone can set.
   if (process.env.EXPO_PUBLIC_DOMAIN) {
     return stripProtocol(process.env.EXPO_PUBLIC_DOMAIN);
   }
 
+  // Convenience fallbacks for the Replit dev environment — these are
+  // populated automatically by the platform there. Not load-bearing: on
+  // any other host, set EXPO_PUBLIC_DOMAIN instead.
+  if (process.env.REPLIT_INTERNAL_APP_DOMAIN) {
+    return stripProtocol(process.env.REPLIT_INTERNAL_APP_DOMAIN);
+  }
+  if (process.env.REPLIT_DEV_DOMAIN) {
+    return stripProtocol(process.env.REPLIT_DEV_DOMAIN);
+  }
+
   console.error(
-    "ERROR: No deployment domain found. Set REPLIT_INTERNAL_APP_DOMAIN, REPLIT_DEV_DOMAIN, or EXPO_PUBLIC_DOMAIN",
+    "ERROR: No deployment domain found. Set EXPO_PUBLIC_DOMAIN to the public host serving the static web build.",
   );
   process.exit(1);
 }

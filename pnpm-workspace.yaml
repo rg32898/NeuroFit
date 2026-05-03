@@ -7,6 +7,14 @@ packages:
 autoInstallPeers: false
 
 catalog:
+  # The three '@replit/*' Vite plugins below are USED ONLY by the optional
+  # `artifacts/mockup-sandbox` design preview server. The api-server, admin,
+  # and mobile artifacts (the only deployable apps) do not depend on them.
+  # mockup-sandbox is a developer convenience for designing UI on a managed
+  # canvas and is excluded from CI, Docker, and production deploys — see
+  # `.dockerignore` and `.github/workflows/ci.yml`. Removing these entries
+  # will not affect the shippable application; it will only disable the
+  # canvas-side preview tooling.
   '@replit/vite-plugin-cartographer': ^0.5.1
   '@replit/vite-plugin-dev-banner': ^0.1.1
   '@replit/vite-plugin-runtime-error-modal': ^0.0.6
