@@ -1,5 +1,4 @@
 import { Feather } from "@expo/vector-icons";
-import { reloadAppAsync } from "expo";
 import React, { useState } from "react";
 import {
   Modal,
@@ -19,6 +18,30 @@ export type ErrorFallbackProps = {
   resetError: () => void;
 };
 
+/**
+ * Cross-platform reload. `expo`'s `reloadAppAsync` is native-only and
+ * importing it at module scope crashes Safari/iOS web because the module
+ * touches native bindings during evaluation. We dynamic-require it on
+ * native and use `window.location.reload()` on web.
+ */
+async function reloadApp(): Promise<void> {
+  if (Platform.OS === "web") {
+    if (typeof globalThis.window !== "undefined") {
+      globalThis.window.location.reload();
+    }
+    return;
+  }
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const expo = require("expo") as { reloadAppAsync?: () => Promise<void> };
+    if (typeof expo.reloadAppAsync === "function") {
+      await expo.reloadAppAsync();
+    }
+  } catch {
+    // Fall through to caller's resetError().
+  }
+}
+
 export function ErrorFallback({ error, resetError }: ErrorFallbackProps) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
@@ -27,11 +50,11 @@ export function ErrorFallback({ error, resetError }: ErrorFallbackProps) {
 
   const handleRestart = async () => {
     try {
-      await reloadAppAsync();
+      await reloadApp();
     } catch (restartError) {
       console.error("Failed to restart app:", restartError);
-      resetError();
     }
+    resetError();
   };
 
   const formatErrorDetails = (): string => {
