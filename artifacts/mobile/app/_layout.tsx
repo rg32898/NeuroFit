@@ -17,6 +17,7 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { AppProvider } from "@/context/AppContext";
 import { useAuthStore } from "@app/lib/auth-store";
 import { initI18n } from "@app/i18n";
+import { initProgressQueue } from "@app/lib/progress-queue";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -37,6 +38,7 @@ function RootLayoutNav() {
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="onboarding" options={{ headerShown: false }} />
       <Stack.Screen name="game" options={{ headerShown: false }} />
+      <Stack.Screen name="workout" options={{ headerShown: false }} />
     </Stack>
   );
 }
@@ -78,6 +80,9 @@ export default function RootLayout() {
   const [i18nLoaded, setI18nLoaded] = React.useState(false);
 
   useEffect(() => {
+    // Drain any progress events left over from a previous run, and wire
+    // the foreground listener so future events flush automatically.
+    const teardown = initProgressQueue();
     void restoreFromStorage();
     // Fail-open: even if i18n init throws (rare — network-free, in-memory),
     // we must not deadlock the splash gate. We log and continue with whatever
@@ -88,6 +93,7 @@ export default function RootLayout() {
         console.warn("i18n.init.failed", err);
       })
       .finally(() => setI18nLoaded(true));
+    return teardown;
   }, [restoreFromStorage]);
 
   const ready = (fontsLoaded || !!fontError) && hydrated && i18nLoaded;

@@ -42,6 +42,39 @@ jest.mock("expo-router", () => ({
   __esModule: true,
   router: { push: jest.fn(), replace: jest.fn(), back: jest.fn() },
   useRouter: () => ({ push: jest.fn(), replace: jest.fn(), back: jest.fn() }),
+  useLocalSearchParams: () => ({}),
   Stack: ({ children }: { children?: unknown }) => children ?? null,
   Link: ({ children }: { children?: unknown }) => children ?? null,
 }));
+
+// In-memory AsyncStorage for tests. Keeps writes deterministic and avoids
+// the "NativeModule: AsyncStorage is null" error that the real package
+// throws under jsdom.
+jest.mock("@react-native-async-storage/async-storage", () => {
+  let store: Record<string, string> = {};
+  return {
+    __esModule: true,
+    default: {
+      getItem: jest.fn(async (k: string) => (k in store ? store[k] : null)),
+      setItem: jest.fn(async (k: string, v: string) => {
+        store[k] = v;
+      }),
+      removeItem: jest.fn(async (k: string) => {
+        delete store[k];
+      }),
+      clear: jest.fn(async () => {
+        store = {};
+      }),
+      getAllKeys: jest.fn(async () => Object.keys(store)),
+      multiGet: jest.fn(async (keys: string[]) =>
+        keys.map((k) => [k, k in store ? store[k] : null] as [string, string | null]),
+      ),
+      multiSet: jest.fn(async (pairs: [string, string][]) => {
+        for (const [k, v] of pairs) store[k] = v;
+      }),
+      multiRemove: jest.fn(async (keys: string[]) => {
+        for (const k of keys) delete store[k];
+      }),
+    },
+  };
+});

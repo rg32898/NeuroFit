@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { api, ApiError, onForcedLogout } from "./api";
 import { clearTokens, loadTokens, saveTokens } from "./tokenStorage";
+import { clearProgressQueue } from "./progress-queue";
 import {
   clearGuestData,
   isOnboarded as readOnboarded,
@@ -136,6 +137,9 @@ export const useAuthStore = create<AuthState>((set) => ({
       // Logging out wipes guest residue too — next launch should treat the
       // device as a fresh install and re-show onboarding.
       await clearGuestData();
+      // Drop any unsent ProgressEvents authored under this account so they
+      // can't be cross-attributed to whoever signs in next on this device.
+      await clearProgressQueue();
       set({
         user: null,
         accessToken: null,

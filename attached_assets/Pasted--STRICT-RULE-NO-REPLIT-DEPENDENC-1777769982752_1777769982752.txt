@@ -1,0 +1,56 @@
+=================================================================
+STRICT RULE — NO REPLIT DEPENDENCIES OR REPLIT-SPECIFIC TOOLS
+=================================================================
+Use only .env for config. No Replit-specific packages or storage.
+=================================================================
+
+CONTEXT:
+Onboarding lands on the Today tab (Prompt 12). Backend has
+/workout/today, /workout/:id/complete (Prompt 7) and progress
+events (Prompt 8).
+
+GOAL:
+Build the Today screen and the workout runner — the daily core
+loop.
+
+DELIVERABLES:
+1. /apps/mobile/src/screens/today/TodayScreen.tsx:
+     - Calls GET /workout/today via React Query
+     - Shows today's date, current streak, and a card per game
+     - Primary CTA: "Start workout" → launches the runner
+     - Below the fold: "Free play" link to the Games tab
+2. /apps/mobile/src/screens/workout/WorkoutRunnerScreen.tsx:
+     - Receives the workout id
+     - Walks the user through the planned games in order
+     - Each game embeds a `GameContainer` (built next prompt)
+     - "Skip this game" button — does NOT abort the workout
+       (FR-3.4)
+3. /apps/mobile/src/lib/progress-queue.ts:
+     - Queues ProgressEvents locally (AsyncStorage)
+     - Each event stamped with a UUIDv4 clientEventId for
+       idempotency
+     - Flushes to POST /progress/events on success or on app
+       foreground; retries with backoff
+4. WorkoutCompleteScreen — celebration + streak update + per-
+   domain proficiency deltas pulled from the API response.
+5. Add a "Relaxed mode" indicator to the Today header. Tapping
+   it opens the timer-scale picker.
+6. Tests:
+     - Render TodayScreen with a mocked API → 3 game cards
+     - Tapping "Skip this game" advances to the next game
+     - Completing all games triggers /workout/:id/complete
+       exactly once
+
+DO NOT:
+- Show ads in the runner (FR-7.5).
+- Block the user on a paywall mid-workout.
+- Use device-clock timestamps for streaks — server is authority.
+
+VERIFY:
+- A full workout end-to-end persists 3+ ProgressEvents
+  server-side.
+- Force-quitting and reopening mid-workout resumes from the next
+  uncompleted game.
+
+OUTPUT:
+Screen flow diagram in text + the React Query keys used.
