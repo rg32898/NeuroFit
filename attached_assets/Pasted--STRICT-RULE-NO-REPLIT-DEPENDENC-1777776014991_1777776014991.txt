@@ -1,0 +1,58 @@
+=================================================================
+STRICT RULE — NO REPLIT DEPENDENCIES OR REPLIT-SPECIFIC TOOLS
+=================================================================
+Use only .env for config. No Replit-specific packages or storage.
+For ads: use Google AdMob via react-native-google-mobile-ads or
+AppLovin MAX — both standard SDKs, configured via .env.
+=================================================================
+
+CONTEXT:
+The app works online end-to-end (Prompts 11–18). Now we add
+offline support, robust sync, and rewarded ads.
+
+GOAL:
+Implement FR-7.x (rewarded ads only) and FR-9.x (offline mode +
+multi-device sync).
+
+DELIVERABLES:
+1. /apps/mobile/src/lib/offline-cache.ts:
+     - Pre-downloads next 3 days of games + items on
+       app-foreground if online
+     - Stores in AsyncStorage with a TTL
+2. Update GameContainer to read from offline cache on network
+   failure
+3. progress-queue (Prompt 13) extension:
+     - Persists across cold-starts
+     - Syncs on connectivity restoration
+     - Conflict resolution: server merges by clientEventId
+       (FR-9.3); never last-write-wins
+4. /apps/mobile/src/lib/ads.ts:
+     - Loads a rewarded ad from AdMob using a test ad unit in dev
+     - Single API: showRewardedAd(reasonCode) → Promise<boolean>
+     - Caps: 1 per app-open session (FR-7.4); never during workout
+       (FR-7.5)
+     - Premium subscribers get an early-return false without ever
+       initialising the ad SDK (FR-7.7)
+5. .env.example append:
+     EXPO_PUBLIC_ADMOB_ANDROID_REWARDED_UNIT=
+     EXPO_PUBLIC_ADMOB_IOS_REWARDED_UNIT=
+6. Add a "Watch ad to unlock today's premium game" CTA on the
+   Games tab for free users (off by default; only on opt-in tap).
+7. Tests:
+     - Going offline mid-workout still completes the workout
+     - Reconnecting drains the queue with no duplicates server-side
+     - Rewarded-ad cap returns false on the second attempt
+
+DO NOT:
+- Show interstitial / banner / native ads. Rewarded only.
+- Hide the workout behind an ad gate.
+- Use any ad mediator that requires "Replit" anywhere.
+
+VERIFY:
+- Airplane mode → complete workout → re-enable network →
+  ProgressEvents arrive on the server, deduped by
+  clientEventId.
+- Premium user never sees an ad.
+
+OUTPUT:
+Sequence diagram (text) of the offline → online sync.

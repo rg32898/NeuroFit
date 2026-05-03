@@ -1,11 +1,21 @@
 import { Feather } from "@expo/vector-icons";
-import React from "react";
-import { Platform, ScrollView, StyleSheet, Text, View } from "react-native";
+import React, { useState } from "react";
+import {
+  Alert,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { GameCard } from "@/components/GameCard";
 import { useApp } from "@/context/AppContext";
 import { useColors } from "@/hooks/useColors";
+import { showRewardedAd } from "@app/lib/ads";
+import { useSubscriptionStatus } from "@app/lib/subscription-api";
 
 export const GAMES = [
   {
@@ -46,6 +56,39 @@ export default function TrainScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { getBestScore } = useApp();
+  const subStatus = useSubscriptionStatus();
+  // Only show the CTA once we KNOW the user is on a free-tier status.
+  // While the query is loading we treat the user as "unknown" and keep
+  // the CTA hidden — premium users must never see (or be able to tap)
+  // the ad button, even briefly during hydration.
+  const isFreeUser =
+    subStatus.isSuccess &&
+    !!subStatus.data &&
+    (subStatus.data.status === "free" ||
+      subStatus.data.status === "expired" ||
+      subStatus.data.status === "canceled");
+  const [unlocked, setUnlocked] = useState(false);
+  const [adLoading, setAdLoading] = useState(false);
+
+  // FR-7.x — opt-in only. The CTA is hidden for premium users entirely
+  // and never auto-plays an ad. The user must explicitly tap.
+  const onUnlockTap = async () => {
+    if (adLoading) return;
+    setAdLoading(true);
+    try {
+      const earned = await showRewardedAd("unlock_premium_game");
+      if (earned) {
+        setUnlocked(true);
+      } else {
+        Alert.alert(
+          "No ad available",
+          "Try again later, or subscribe to unlock all games.",
+        );
+      }
+    } finally {
+      setAdLoading(false);
+    }
+  };
 
   const topPad = Platform.OS === "web" ? 67 : insets.top;
 
@@ -80,6 +123,48 @@ export default function TrainScreen() {
           Pattern Finder is today&apos;s featured challenge
         </Text>
       </View>
+
+      {isFreeUser && !unlocked && (
+        <Pressable
+          onPress={onUnlockTap}
+          disabled={adLoading}
+          accessibilityRole="button"
+          accessibilityLabel="Watch ad to unlock today's premium game"
+          style={[
+            styles.adCta,
+            {
+              backgroundColor: colors.card,
+              marginHorizontal: 20,
+              borderRadius: colors.radius,
+              opacity: adLoading ? 0.6 : 1,
+            },
+          ]}
+        >
+          <Feather name="gift" size={16} color="#10B981" />
+          <Text style={[styles.adCtaText, { color: colors.foreground }]}>
+            {adLoading
+              ? "Loading ad…"
+              : "Watch ad to unlock today's premium game"}
+          </Text>
+        </Pressable>
+      )}
+      {isFreeUser && unlocked && (
+        <View
+          style={[
+            styles.adCta,
+            {
+              backgroundColor: colors.card,
+              marginHorizontal: 20,
+              borderRadius: colors.radius,
+            },
+          ]}
+        >
+          <Feather name="check-circle" size={16} color="#10B981" />
+          <Text style={[styles.adCtaText, { color: colors.foreground }]}>
+            Premium game unlocked for today
+          </Text>
+        </View>
+      )}
 
       <View style={{ marginHorizontal: 20, marginTop: 20 }}>
         {GAMES.map((game) => (
@@ -145,4 +230,12 @@ const styles = StyleSheet.create({
     flex: 1,
     lineHeight: 18,
   },
+  adCta: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    padding: 14,
+    marginTop: 8,
+  },
+  adCtaText: { fontSize: 13, fontFamily: "Inter_500Medium", flex: 1 },
 });

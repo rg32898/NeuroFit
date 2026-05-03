@@ -31,6 +31,56 @@ jest.mock("react-i18next", () => ({
   initReactI18next: { type: "3rdParty", init: () => {} },
 }));
 
+// NetInfo is a native module — stub a no-op event source so the progress
+// queue's `loadNetInfo()` finds something to subscribe to without crashing.
+jest.mock("@react-native-community/netinfo", () => ({
+  __esModule: true,
+  default: {
+    addEventListener: jest.fn(() => () => undefined),
+  },
+  addEventListener: jest.fn(() => () => undefined),
+}));
+
+// AdMob native module — stubbed so `loadSdk()` returns a working module
+// in tests. Tests can override individual methods via jest.requireMock.
+jest.mock("react-native-google-mobile-ads", () => {
+  const RewardedAdEventType = { LOADED: "loaded", EARNED_REWARD: "earned" };
+  const AdEventType = { CLOSED: "closed", ERROR: "error" };
+  const createForAdRequest = () => {
+    const listeners: Record<string, Array<(d?: unknown) => void>> = {};
+    return {
+      load: jest.fn(() => {
+        setTimeout(() => {
+          (listeners[RewardedAdEventType.LOADED] || []).forEach((fn) => fn());
+        }, 0);
+      }),
+      show: jest.fn(async () => {
+        setTimeout(() => {
+          (listeners[RewardedAdEventType.EARNED_REWARD] || []).forEach((fn) =>
+            fn(),
+          );
+          (listeners[AdEventType.CLOSED] || []).forEach((fn) => fn());
+        }, 0);
+      }),
+      addAdEventListener: jest.fn(
+        (type: string, fn: (d?: unknown) => void) => {
+          (listeners[type] = listeners[type] || []).push(fn);
+          return () => {
+            listeners[type] = (listeners[type] || []).filter((l) => l !== fn);
+          };
+        },
+      ),
+    };
+  };
+  return {
+    __esModule: true,
+    default: { initialize: jest.fn(async () => undefined) },
+    RewardedAd: { createForAdRequest },
+    RewardedAdEventType,
+    AdEventType,
+  };
+});
+
 jest.mock("expo-secure-store", () => ({
   __esModule: true,
   setItemAsync: jest.fn(async () => undefined),

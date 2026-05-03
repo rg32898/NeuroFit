@@ -1,0 +1,85 @@
+=================================================================
+STRICT RULE — NO REPLIT DEPENDENCIES OR REPLIT-SPECIFIC TOOLS
+=================================================================
+This is the final prompt. After this, the project must run
+unmodified on a fresh laptop with: git, Node 20, pnpm 9, Docker.
+NO Replit-specific files at the project root may be required for
+build, test, or deploy. .replit/replit.nix may exist as a
+convenience but must not be load-bearing.
+=================================================================
+
+CONTEXT:
+The full app is built. We now harden it for export and document
+how to ship it.
+
+GOAL:
+Make the repo a clean, exportable artifact. Anyone who clones
+the repo on a laptop should be able to bring up everything in
+under 10 minutes.
+
+DELIVERABLES:
+1. Verify all .env.example files list every variable used. Add a
+   root /.env.example that aggregates references. README links
+   to provider sign-up pages (Neon, Stripe, AdMob, Resend, Expo).
+2. /docker-compose.yml at the repo root with services:
+     - postgres (16-alpine)
+     - api (built from /apps/api/Dockerfile)
+     - admin (built from /apps/admin/Dockerfile)
+3. /apps/api/Dockerfile — multi-stage build, runs `pnpm install`
+   and `pnpm build`, ships dist + node_modules.
+4. /apps/admin/Dockerfile — Next.js standalone output.
+5. /apps/mobile — no Dockerfile (Expo). Document the Expo build
+   path (EAS optional, `expo build` legacy not used).
+6. /scripts/dev.sh — single command that:
+     - copies .env.example to .env if missing
+     - boots Postgres in docker
+     - runs prisma migrate + seed
+     - starts api, admin, and prints next steps
+7. .github/workflows/ci.yml — runs typecheck + tests on PR for
+   api, admin, mobile (lint + jest only on mobile, no Expo build
+   in CI to stay fast).
+8. README at repo root — full rewrite:
+     - One-paragraph overview
+     - Stack table
+     - Prerequisites
+     - Quickstart (clone → docker compose up → expo start)
+     - Environment variables (full table with provider links)
+     - Project structure
+     - Testing
+     - Deployment recipes:
+         · API → Render / Fly.io / Railway / your-VPS
+         · Admin → Vercel / Render / your-VPS
+         · Mobile → EAS Build → App Store / Play Store
+     - Going to production checklist
+     - License (MIT recommended; user choice)
+9. /docs/architecture.md — short doc summarising the auth flow,
+   workout assembly, streak engine, sync model, and the trust-
+   layer requirements (link the mapping to FR-IDs from the
+   requirements doc).
+10. Sanity-pass: run `rg -i "replit" .` in the repo and remove
+    every match that is not a comment explicitly disclaiming
+    Replit-specific behaviour.
+11. Tag a v0.1.0 git tag and write a CHANGELOG.md with what each
+    prompt added.
+
+DO NOT:
+- Leave any Replit-specific config as load-bearing.
+- Commit any .env file. Only .env.example.
+- Push secrets to git history (gitleaks check optional).
+
+VERIFY:
+- Fresh laptop checkout:
+     git clone <repo>
+     cp .env.example .env  (and fill keys)
+     docker compose up -d postgres
+     pnpm install
+     pnpm --filter api db:migrate && pnpm --filter api db:seed
+     pnpm --filter api dev
+     pnpm --filter admin dev
+     pnpm --filter mobile start
+   …all services come up cleanly.
+- `rg -i replit` returns only the rule-block disclaimers.
+
+OUTPUT:
+The final folder tree, the README table of contents, and the
+exact list of env vars required to run end-to-end.

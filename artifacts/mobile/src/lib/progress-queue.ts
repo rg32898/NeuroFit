@@ -5,6 +5,28 @@ import { ApiError, api, onForcedLogout } from "./api";
 import { uuidv4 } from "./uuid";
 
 /**
+ * NetInfo is loaded dynamically — it's a native module that's not present
+ * in jest. When unavailable we silently skip the connectivity-restored
+ * trigger; AppState foreground + scheduled retry still drain the queue.
+ */
+type NetInfoUnsubscribe = () => void;
+type NetInfoState = { isConnected: boolean | null };
+type NetInfoModule = {
+  addEventListener: (cb: (s: NetInfoState) => void) => NetInfoUnsubscribe;
+};
+function loadNetInfo(): NetInfoModule | null {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const mod = require("@react-native-community/netinfo") as {
+      default?: NetInfoModule;
+    } & NetInfoModule;
+    return mod.default ?? mod;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Local-first ProgressEvent queue.
  *
  * Why this exists:
@@ -222,11 +244,34 @@ export function initProgressQueue(): () => void {
   const unsubLogout = onForcedLogout(() => {
     void clearProgressQueue();
   });
+  // FR-9.2 — flush as soon as connectivity is restored, NOT only on the
+  // next foreground tick. The user might still be in the middle of a
+  // workout when the network reappears.
+  let unsubNet: NetInfoUnsubscribe | null = null;
+  let wasConnected: boolean | null = null;
+  const netInfo = loadNetInfo();
+  if (netInfo) {
+    unsubNet = netInfo.addEventListener((state) => {
+      const isUp = state.isConnected === true;
+      // Edge-trigger: only flush when transitioning from offline → online.
+      if (isUp && wasConnected === false) {
+        // Reset backoff so the first post-reconnect attempt is immediate.
+        attempt = 0;
+        if (retryHandle) {
+          clearTimeout(retryHandle);
+          retryHandle = null;
+        }
+        void flush();
+      }
+      wasConnected = isUp;
+    });
+  }
   // Drain anything left over from the previous session.
   void flush();
   return () => {
     sub.remove();
     unsubLogout();
+    if (unsubNet) unsubNet();
   };
 }
 

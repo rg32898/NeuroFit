@@ -3,7 +3,8 @@ import { View } from "react-native";
 import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
 
-import { api } from "../../lib/api";
+import { ApiError, api } from "../../lib/api";
+import { getCachedItems } from "../../lib/offline-cache";
 import { enqueue } from "../../lib/progress-queue";
 import type { PlannedGame } from "../../lib/workout-api";
 import {
@@ -105,11 +106,28 @@ export function GameContainer({
   const itemsQuery = useQuery({
     queryKey: gameItemsKey(game.slug, sessionId),
     enabled: !itemsOverride && !!definition,
+    // Don't retry on a network failure — we want to immediately fall
+    // back to the offline cache rather than block the UI for ~10s of
+    // exponential retries.
+    retry: false,
     queryFn: async () => {
-      const res = await api.get<ItemResponse>(
-        `/api/games/${game.slug}/items`,
-      );
-      return res.items.slice(0, ITEMS_PER_SESSION);
+      try {
+        const res = await api.get<ItemResponse>(
+          `/api/games/${game.slug}/items`,
+        );
+        return res.items.slice(0, ITEMS_PER_SESSION);
+      } catch (err) {
+        // FR-9.1 — offline fallback. ONLY engage the cache for genuine
+        // network failures (no ApiError instance — fetch threw) or 5xx
+        // server errors. 4xx responses (401/403/404/422/etc) reflect a
+        // logical problem the cache can't fix, so we surface them.
+        const isNetworkOrServer =
+          !(err instanceof ApiError) || err.status >= 500;
+        if (!isNetworkOrServer) throw err;
+        const cached = await getCachedItems(game.slug);
+        if (cached) return cached.items.slice(0, ITEMS_PER_SESSION);
+        throw err;
+      }
     },
   });
 

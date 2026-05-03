@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Alert, View } from "react-native";
 import { useTranslation } from "react-i18next";
 
@@ -6,6 +6,7 @@ import type { PlannedGame, WorkoutCompleteResponse } from "../../lib/workout-api
 import { Button, Card, Screen, Text } from "../../components/ui";
 import { GameContainer } from "../../components/GameContainer";
 import { useTheme } from "../../theme";
+import { setWorkoutActive } from "../../lib/workout-state";
 
 export type GameResult = { gameId: string; score: number };
 
@@ -62,6 +63,13 @@ export function WorkoutRunnerScreen({
   const [index, setIndex] = useState(initialIndex);
   const [results, setResults] = useState<GameResult[]>([...initialResults]);
   const [submitting, setSubmitting] = useState(false);
+
+  // FR-7.5 — flag the workout as active so `showRewardedAd` short-circuits
+  // for the entire duration the runner is mounted. Cleared on unmount.
+  useEffect(() => {
+    setWorkoutActive(true);
+    return () => setWorkoutActive(false);
+  }, []);
 
   // Synchronous completion guards — set BEFORE any await so concurrent
   // calls from a rapid double-tap can't both observe "not submitting yet"

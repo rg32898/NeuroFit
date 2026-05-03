@@ -18,6 +18,8 @@ import { AppProvider } from "@/context/AppContext";
 import { useAuthStore } from "@app/lib/auth-store";
 import { initI18n } from "@app/i18n";
 import { initProgressQueue } from "@app/lib/progress-queue";
+import { initOfflineCache } from "@app/lib/offline-cache";
+import { configureAds } from "@app/lib/ads";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -85,6 +87,23 @@ export default function RootLayout() {
     // Drain any progress events left over from a previous run, and wire
     // the foreground listener so future events flush automatically.
     const teardown = initProgressQueue();
+    // FR-9.1 — kick off offline catalogue + items prefetch and wire the
+    // foreground listener so we top the cache up on every wake.
+    const teardownCache = initOfflineCache();
+    // FR-7.7 — wire the premium-status getter into the ads module so it
+    // short-circuits before initialising the SDK for paying users. Read
+    // through the React Query cache the next time `showRewardedAd` is
+    // called, so we always reflect the latest server state.
+    configureAds({
+      isPremium: () => {
+        const data = queryClient.getQueryData<{ status?: string }>([
+          "subscription",
+          "status",
+        ]);
+        const s = data?.status;
+        return s === "active" || s === "trialing" || s === "grace";
+      },
+    });
     void restoreFromStorage();
     // Fail-open: even if i18n init throws (rare — network-free, in-memory),
     // we must not deadlock the splash gate. We log and continue with whatever
@@ -95,7 +114,10 @@ export default function RootLayout() {
         console.warn("i18n.init.failed", err);
       })
       .finally(() => setI18nLoaded(true));
-    return teardown;
+    return () => {
+      teardown();
+      teardownCache();
+    };
   }, [restoreFromStorage]);
 
   const ready = (fontsLoaded || !!fontError) && hydrated && i18nLoaded;
