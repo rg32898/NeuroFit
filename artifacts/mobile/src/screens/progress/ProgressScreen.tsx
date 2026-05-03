@@ -51,16 +51,8 @@ export function ProgressScreen({
   const theme = useTheme();
   const { t } = useTranslation();
 
-  if (loading && !summary) {
-    return (
-      <Screen scrollable={false}>
-        <View style={styles.center}>
-          <ActivityIndicator color={theme.colors.primary} />
-        </View>
-      </Screen>
-    );
-  }
-
+  // Error takes priority over loading: if the fetch failed and we have no
+  // cached summary, surface the retry UI even if a refetch is in flight.
   if (error && !summary) {
     return (
       <Screen scrollable={false}>
@@ -89,7 +81,21 @@ export function ProgressScreen({
     );
   }
 
-  const s = summary!;
+  // Show the spinner whenever we have no summary yet — covers loading, but
+  // also the "react-query disabled because user not yet hydrated / signed
+  // out" path. Previously this fell through to `summary!.dailyCompletions`
+  // and crashed with "Cannot read property 'dailyCompletions' of undefined".
+  if (!summary) {
+    return (
+      <Screen scrollable={false}>
+        <View style={styles.center}>
+          <ActivityIndicator color={theme.colors.primary} />
+        </View>
+      </Screen>
+    );
+  }
+
+  const s = summary;
   const dailyValues = s.dailyCompletions.map((d) => d.count);
   const totalLast30 = dailyValues.reduce((a, b) => a + b, 0);
 
