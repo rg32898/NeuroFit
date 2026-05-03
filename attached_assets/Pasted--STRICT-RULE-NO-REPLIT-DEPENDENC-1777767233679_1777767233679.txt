@@ -1,0 +1,52 @@
+=================================================================
+STRICT RULE — NO REPLIT DEPENDENCIES OR REPLIT-SPECIFIC TOOLS
+=================================================================
+Use only .env for config. No Replit-specific packages or storage.
+=================================================================
+
+CONTEXT:
+The Expo shell is wired (Prompt 11). Backend has /auth, /profile,
+and /profile/assessment endpoints (Prompts 4–5). The mobile app
+has placeholder screens.
+
+GOAL:
+Build the onboarding journey, respecting FR-1.1 to FR-1.8:
+- No payment screen in the first 3 sessions
+- Skippable assessment
+- Optional sign-up (guest mode allowed)
+
+DELIVERABLES:
+1. /apps/mobile/src/screens/onboarding/WelcomeScreen.tsx:
+     - "Try a workout (no account needed)" — primary
+     - "I have an account" — secondary
+2. AssessmentScreen.tsx:
+     - 5 short questions (one per non-memory domain)
+     - "Skip for now" always visible
+     - Calls POST /profile/assessment on completion
+3. RegisterScreen.tsx, LoginScreen.tsx — plain email/password.
+   OAuth buttons for Apple/Google are visible but stubbed
+   (alert "Coming soon").
+4. GuestModeBanner — a small persistent banner shown until the
+   user signs up, copy: "Save your progress — create a free account."
+5. Wire navigation: Welcome → Assessment → Today (tab navigator)
+   for guest path; Welcome → Login → Today for returning users.
+6. /apps/mobile/src/lib/guest.ts: stores a local-only userId in
+   secure-store; a "promote-to-account" path that ports local
+   progress events to the new account on sign-up.
+7. Tests with React Native Testing Library:
+     - Skipping the assessment lands on Today
+     - Submitting the assessment hits the API mock
+     - Login error shows a friendly message
+
+DO NOT:
+- Show ANY paywall, subscription offer, or pricing screen during
+  onboarding (FR-1.5).
+- Force account creation before the third workout.
+
+VERIFY:
+- Cold-start to first game in ≤ 60 seconds (NFR-6.1).
+- Assessment can be skipped at any step.
+- Guest progress survives an app restart (secure-store).
+
+OUTPUT:
+Screen list + a one-paragraph walkthrough of the happy path.

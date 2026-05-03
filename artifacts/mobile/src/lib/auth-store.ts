@@ -1,13 +1,19 @@
 import { create } from "zustand";
 import { api, ApiError, onForcedLogout } from "./api";
 import { clearTokens, loadTokens, saveTokens } from "./tokenStorage";
+import {
+  clearGuestData,
+  isOnboarded as readOnboarded,
+  promoteGuestToAccount,
+  setOnboarded as writeOnboarded,
+} from "./guest";
 
 export type AuthUser = {
   id: string;
   email: string;
 };
 
-type LoginResponse = {
+type AuthResponse = {
   accessToken: string;
   refreshToken: string;
   user: AuthUser;
@@ -21,10 +27,18 @@ type AuthState = {
   hydrated: boolean;
   /** True while a login / restore call is in flight. */
   loading: boolean;
+  /**
+   * True once the user has completed (or skipped) the onboarding journey.
+   * Persisted in secure-store so we never re-show onboarding on app launch.
+   */
+  onboarded: boolean;
 
   login: (email: string, password: string) => Promise<void>;
+  register: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   restoreFromStorage: () => Promise<void>;
+  /** Mark onboarding complete (called from skip / finish handlers). */
+  markOnboarded: () => Promise<void>;
   /** Set by api.ts when a forced logout occurs (refresh failed). */
   _handleForcedLogout: () => Promise<void>;
 };
@@ -37,17 +51,18 @@ type AuthState = {
  * localStorage on web). We mirror the tokens into the store so screens can
  * read them synchronously without an await.
  */
-export const useAuthStore = create<AuthState>((set, get) => ({
+export const useAuthStore = create<AuthState>((set) => ({
   user: null,
   accessToken: null,
   refreshToken: null,
   hydrated: false,
   loading: false,
+  onboarded: false,
 
   async login(email, password) {
     set({ loading: true });
     try {
-      const res = await api.post<LoginResponse>("/api/auth/login", {
+      const res = await api.post<AuthResponse>("/api/auth/login", {
         email,
         password,
       });
@@ -60,6 +75,45 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         accessToken: res.accessToken,
         refreshToken: res.refreshToken,
       });
+      // Best-effort: drain any guest-queued events into the new account.
+      // Failures are logged inside promoteGuestToAccount; the auth call
+      // itself must still succeed even if a replay event fails.
+      try {
+        await promoteGuestToAccount();
+      } catch (err) {
+        console.warn("auth.login.promote_failed", err);
+      }
+      // Logging in implies onboarding is done.
+      await writeOnboarded(true);
+      set({ onboarded: true });
+    } finally {
+      set({ loading: false });
+    }
+  },
+
+  async register(email, password) {
+    set({ loading: true });
+    try {
+      const res = await api.post<AuthResponse>("/api/auth/register", {
+        email,
+        password,
+      });
+      await saveTokens({
+        accessToken: res.accessToken,
+        refreshToken: res.refreshToken,
+      });
+      set({
+        user: res.user,
+        accessToken: res.accessToken,
+        refreshToken: res.refreshToken,
+      });
+      try {
+        await promoteGuestToAccount();
+      } catch (err) {
+        console.warn("auth.register.promote_failed", err);
+      }
+      await writeOnboarded(true);
+      set({ onboarded: true });
     } finally {
       set({ loading: false });
     }
@@ -79,16 +133,30 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       }
     } finally {
       await clearTokens();
-      set({ user: null, accessToken: null, refreshToken: null });
+      // Logging out wipes guest residue too — next launch should treat the
+      // device as a fresh install and re-show onboarding.
+      await clearGuestData();
+      set({
+        user: null,
+        accessToken: null,
+        refreshToken: null,
+        onboarded: false,
+      });
     }
   },
 
   async restoreFromStorage() {
     set({ loading: true });
     try {
+      const onboarded = await readOnboarded();
       const { accessToken, refreshToken } = await loadTokens();
       if (!accessToken || !refreshToken) {
-        set({ user: null, accessToken: null, refreshToken: null });
+        set({
+          user: null,
+          accessToken: null,
+          refreshToken: null,
+          onboarded,
+        });
         return;
       }
       // We trust the access token until the first authenticated request
@@ -104,22 +172,41 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           user: me.user,
           accessToken: fresh.accessToken ?? accessToken,
           refreshToken: fresh.refreshToken ?? refreshToken,
+          // Having a valid session implies onboarding completed in the past;
+          // backfill the flag so an upgrade from a pre-flag build behaves.
+          onboarded: true,
         });
+        if (!onboarded) await writeOnboarded(true);
       } catch (err) {
         // /api/auth/me failed even after one refresh attempt — clear and
         // present the auth stack.
         if (err instanceof ApiError && err.status === 401) {
           await clearTokens();
-          set({ user: null, accessToken: null, refreshToken: null });
+          set({
+            user: null,
+            accessToken: null,
+            refreshToken: null,
+            onboarded,
+          });
         } else {
           // Network error — keep tokens so we can try again on next
           // foreground; just don't promote to authenticated yet.
-          set({ user: null, accessToken, refreshToken });
+          set({
+            user: null,
+            accessToken,
+            refreshToken,
+            onboarded,
+          });
         }
       }
     } finally {
       set({ hydrated: true, loading: false });
     }
+  },
+
+  async markOnboarded() {
+    await writeOnboarded(true);
+    set({ onboarded: true });
   },
 
   async _handleForcedLogout() {
@@ -133,3 +220,4 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 onForcedLogout(() => {
   void useAuthStore.getState()._handleForcedLogout();
 });
+

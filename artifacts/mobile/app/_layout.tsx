@@ -6,7 +6,7 @@ import {
   useFonts,
 } from "@expo-google-fonts/inter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Stack } from "expo-router";
+import { Stack, router } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
@@ -35,9 +35,34 @@ function RootLayoutNav() {
       }}
     >
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+      <Stack.Screen name="onboarding" options={{ headerShown: false }} />
       <Stack.Screen name="game" options={{ headerShown: false }} />
     </Stack>
   );
+}
+
+/**
+ * Decides where to land the user once everything has hydrated.
+ *
+ *   - Has a session         → keep current route (tabs by default).
+ *   - Hasn't completed onboarding (and not signed in) → /onboarding/welcome.
+ *   - Otherwise (guest who already onboarded) → keep current route.
+ *
+ * We only replace ONCE on hydration completion; downstream navigation is
+ * driven by the route handlers themselves.
+ */
+function useOnboardingGate(ready: boolean) {
+  const user = useAuthStore((s) => s.user);
+  const onboarded = useAuthStore((s) => s.onboarded);
+  const [redirected, setRedirected] = React.useState(false);
+
+  useEffect(() => {
+    if (!ready || redirected) return;
+    if (!user && !onboarded) {
+      router.replace("/onboarding/welcome");
+    }
+    setRedirected(true);
+  }, [ready, redirected, user, onboarded]);
 }
 
 export default function RootLayout() {
@@ -65,13 +90,14 @@ export default function RootLayout() {
       .finally(() => setI18nLoaded(true));
   }, [restoreFromStorage]);
 
-  useEffect(() => {
-    if ((fontsLoaded || fontError) && hydrated && i18nLoaded) {
-      SplashScreen.hideAsync();
-    }
-  }, [fontsLoaded, fontError, hydrated, i18nLoaded]);
+  const ready = (fontsLoaded || !!fontError) && hydrated && i18nLoaded;
+  useOnboardingGate(ready);
 
-  if ((!fontsLoaded && !fontError) || !hydrated || !i18nLoaded) return null;
+  useEffect(() => {
+    if (ready) SplashScreen.hideAsync();
+  }, [ready]);
+
+  if (!ready) return null;
 
   return (
     <SafeAreaProvider>

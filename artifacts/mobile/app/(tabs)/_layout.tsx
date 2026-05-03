@@ -8,6 +8,7 @@ import React from "react";
 import { Platform, StyleSheet, View, useColorScheme } from "react-native";
 
 import { useColors } from "@/hooks/useColors";
+import { GuestModeBanner } from "@app/components/GuestModeBanner";
 
 function NativeTabLayout() {
   return (
@@ -123,8 +124,12 @@ function ClassicTabLayout() {
 }
 
 export default function TabLayout() {
-  if (isLiquidGlassAvailable()) {
-    return <NativeTabLayout />;
-  }
-  return <ClassicTabLayout />;
+  // Persistent guest banner — renders nothing once a user is signed in,
+  // so the tab UI stays clean for authenticated sessions.
+  return (
+    <View style={{ flex: 1 }}>
+      <GuestModeBanner />
+      {isLiquidGlassAvailable() ? <NativeTabLayout /> : <ClassicTabLayout />}
+    </View>
+  );
 }
