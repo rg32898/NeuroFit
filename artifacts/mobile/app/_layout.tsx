@@ -82,6 +82,15 @@ export default function RootLayout() {
   const restoreFromStorage = useAuthStore((s) => s.restoreFromStorage);
   const hydrated = useAuthStore((s) => s.hydrated);
   const [i18nLoaded, setI18nLoaded] = React.useState(false);
+  // Hard ceiling on the splash gate. If any of the readiness signals
+  // (fonts/i18n/hydration) silently hangs — which we've seen on web when
+  // the Inter font request stalls behind the proxy — fall through after
+  // 3s so the user sees something instead of an indefinitely white screen.
+  const [forceReady, setForceReady] = React.useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setForceReady(true), 1000);
+    return () => clearTimeout(t);
+  }, []);
 
   useEffect(() => {
     // Drain any progress events left over from a previous run, and wire
@@ -120,7 +129,13 @@ export default function RootLayout() {
     };
   }, [restoreFromStorage]);
 
-  const ready = (fontsLoaded || !!fontError) && hydrated && i18nLoaded;
+  // Hydration must always complete before we let the onboarding gate run —
+  // otherwise a slow `/api/auth/me` probe (>1s) would let a returning,
+  // signed-in user be redirected to /onboarding/welcome on the default
+  // (`user=null, onboarded=false`) state. The `forceReady` fallback only
+  // bypasses the fonts+i18n half of the gate, never auth hydration.
+  const ready =
+    hydrated && (forceReady || ((fontsLoaded || !!fontError) && i18nLoaded));
   useOnboardingGate(ready);
 
   useEffect(() => {
