@@ -2,13 +2,11 @@ module.exports = function (api) {
   api.cache(true);
   return {
     presets: [["babel-preset-expo", { unstable_transformImportMeta: true }]],
-    plugins: [
-      // Required by `react-native-reanimated@^4` on native. Without this
-      // plugin, every `useSharedValue` / `useAnimatedStyle` / `withTiming`
-      // call throws at runtime on iOS and Android (web has a JS shim, so
-      // it silently works there — which is exactly the failure mode we
-      // saw: "works on web, fails on Apple/Android"). MUST be last.
-      "react-native-worklets/plugin",
-    ],
+    // NOTE: Do NOT add `react-native-worklets/plugin` here.
+    // `babel-preset-expo` (SDK 54+, v14+) auto-injects it when
+    // `react-native-worklets` is installed (see preset's build/index.js).
+    // Adding it manually double-transforms every worklet, which silently
+    // breaks Reanimated on iOS/Android (web is unaffected because of the
+    // JS shim) and surfaces as the ErrorBoundary fallback on real devices.
   };
 };

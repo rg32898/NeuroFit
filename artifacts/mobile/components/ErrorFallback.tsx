@@ -100,6 +100,42 @@ export function ErrorFallback({ error, resetError }: ErrorFallbackProps) {
           Please reload the app to continue.
         </Text>
 
+        {/*
+          Always show the error message inline (not just in __DEV__) so a
+          user testing on a real device can read or screenshot what went
+          wrong without having to find the tiny alert-circle button. The
+          modal still gives full stack details in dev. We keep this short
+          (message + first stack frame) so it doesn't dominate the screen.
+        */}
+        <View
+          style={[
+            styles.inlineError,
+            { backgroundColor: colors.card, borderColor: colors.border },
+          ]}
+        >
+          <Text
+            selectable
+            style={[
+              styles.inlineErrorText,
+              { color: colors.foreground, fontFamily: monoFont },
+            ]}
+          >
+            {error.message || "(no error message)"}
+          </Text>
+          {error.stack ? (
+            <Text
+              selectable
+              style={[
+                styles.inlineErrorStack,
+                { color: colors.mutedForeground, fontFamily: monoFont },
+              ]}
+              numberOfLines={3}
+            >
+              {error.stack.split("\n").slice(1, 4).join("\n")}
+            </Text>
+          ) : null}
+        </View>
+
         <Pressable
           onPress={handleRestart}
           style={({ pressed }) => [
@@ -297,5 +333,22 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 18,
     width: "100%",
+  },
+  inlineError: {
+    width: "100%",
+    maxWidth: 600,
+    borderRadius: 8,
+    borderWidth: StyleSheet.hairlineWidth,
+    padding: 12,
+    gap: 6,
+  },
+  inlineErrorText: {
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  inlineErrorStack: {
+    fontSize: 10,
+    lineHeight: 14,
+    opacity: 0.75,
   },
 });
