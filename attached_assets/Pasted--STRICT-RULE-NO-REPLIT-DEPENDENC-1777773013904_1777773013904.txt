@@ -1,0 +1,49 @@
+=================================================================
+STRICT RULE — NO REPLIT DEPENDENCIES OR REPLIT-SPECIFIC TOOLS
+=================================================================
+Use only .env for config. No Replit-specific packages or storage.
+=================================================================
+
+CONTEXT:
+Game framework is in place (Prompt 14). Backend serves items per
+game (Prompt 6). We seeded one game per domain.
+
+GOAL:
+Implement four playable games using the framework. They will be
+basic but real — no placeholders.
+
+DELIVERABLES:
+1. /apps/mobile/src/games/vocabulary/SynonymMatch.tsx
+     - Item payload: { word: string, options: string[], answer: number }
+     - Player picks the synonym; grade by index match
+2. /apps/mobile/src/games/math/MentalArith.tsx
+     - Item: { expression: string, answer: number }
+     - Numeric input (no negative-number trap)
+3. /apps/mobile/src/games/memory/PairsRecall.tsx
+     - Item: { grid: 4x4 of word pairs }
+     - Show grid for relaxed-mode-aware duration, hide,
+       quiz on a random pair
+4. /apps/mobile/src/games/reading/Detail.tsx
+     - Item: { passage: string, questions: [{q, options, answer}] }
+     - Inline reading + 2 comprehension questions
+5. Register all four in the registry (Prompt 14).
+6. Update seed.ts to ensure every seeded game has 5 well-formed
+   items matching the schema above.
+7. Each game has a 1-screen tutorial (FR-4.8) the first time the
+   user opens it; "Got it" stores a flag in secure-store so the
+   tutorial doesn't repeat.
+8. Tests for each game's `grade` function: correct vs incorrect
+   answers, edge cases (whitespace, capitalisation for vocab,
+   negative numbers for math).
+
+DO NOT:
+- Hard-code item content in the mobile app — every item comes
+  from the API.
+- Show the answer key in any network response.
+
+VERIFY:
+- Running the workout exercises all four games.
+- Each game records a ProgressEvent with per-item correctness.
+
+OUTPUT:
+The four game module names and a sample item payload for each.
