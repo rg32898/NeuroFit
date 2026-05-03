@@ -3,9 +3,19 @@ import {
   Inter_500Medium,
   Inter_600SemiBold,
   Inter_700Bold,
-  useFonts,
 } from "@expo-google-fonts/inter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+// IMPORTANT: import `useFonts` from `expo-font` directly, NOT from
+// `@expo-google-fonts/inter`. The Google-fonts package has shipped every
+// version (0.3.x – 0.4.2) with NO `dependencies` and NO `peerDependencies`
+// declared in its package.json (verified against the npm registry). Under
+// pnpm's strict isolation that means the inter package's private
+// `node_modules` is empty, so its `useFonts.js` (which does
+// `import { useState } from 'react'`) resolves React to `null` on
+// device — surfacing as `Cannot read property 'useState' of null` at the
+// first render of RootLayout. The `.ttf` asset re-exports above still work
+// because Metro resolves them as relative file paths inside the package.
+import { useFonts } from "expo-font";
 import { Stack, router } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect } from "react";
