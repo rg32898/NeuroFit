@@ -14,7 +14,6 @@ import {
   workoutKeys,
 } from "@app/lib/workout-api";
 import { useTimerScale } from "@app/lib/timer-scale-store";
-import { enqueue } from "@app/lib/progress-queue";
 import {
   clearWorkoutProgress,
   firstPendingIndex,
@@ -95,17 +94,11 @@ export default function WorkoutRunnerRoute() {
       initialResults={initial.results}
       relaxedScale={relaxedScale}
       onGameComplete={async (gameId, score) => {
-        // 1. Persist locally first so a crash before the network round-trip
-        //    still preserves the user's progress.
+        // Persist locally so a crash before the workout is sealed still
+        // preserves resume state. The GAME_COMPLETED ProgressEvent is
+        // owned by GameContainer (Prompt 14 framework) — enqueueing
+        // here too would double-count.
         await recordGameCompleted(workoutId, gameId, score);
-        // 2. Queue the progress event. The queue handles network retries —
-        //    the user is not blocked on connectivity.
-        await enqueue({
-          eventType: "game_completed",
-          sessionId: workoutId,
-          gameId,
-          score,
-        });
       }}
       onWorkoutComplete={async (results) => {
         const response = await completeMutation.mutateAsync({

@@ -3,20 +3,23 @@ import { useEffect, useSyncExternalStore } from "react";
 
 /**
  * "Relaxed mode" — multiplies the per-item time budget for every game in a
- * workout. 1.0× is competitive. 1.5× and 2.0× give the user more thinking
- * time and are intended for older adults, recovery use, or when stress
- * levels are high (FR-7.2).
+ * workout. The five steps map 1:1 to the spec's 100/125/150/175/200 (off)
+ * percentages so the picker UI can render them as `{{scale}}× timer`. At
+ * 2.0× the timer is treated as OFF (Timer.tsx never expires).
  *
- * Persisted in AsyncStorage so the choice survives across launches. We
- * expose a tiny store with `useSyncExternalStore` so any screen can render
- * the current scale and re-render automatically when it changes.
+ * Persisted in AsyncStorage so the choice survives across launches. The
+ * tiny external-store API lets any screen render the current scale and
+ * re-render automatically when it changes.
  */
 
 const STORAGE_KEY = "nf_timer_scale";
 
-export const TIMER_SCALE_OPTIONS = [1, 1.5, 2] as const;
+export const TIMER_SCALE_OPTIONS = [1, 1.25, 1.5, 1.75, 2] as const;
 export type TimerScale = (typeof TIMER_SCALE_OPTIONS)[number];
 const DEFAULT: TimerScale = 1;
+
+/** Sentinel value that disables the per-item countdown entirely. */
+export const TIMER_OFF_SCALE: TimerScale = 2;
 
 let current: TimerScale = DEFAULT;
 let hydrated = false;
@@ -58,8 +61,6 @@ export async function setTimerScale(scale: TimerScale): Promise<void> {
   try {
     await AsyncStorage.setItem(STORAGE_KEY, String(scale));
   } catch (err) {
-    // Persistence failure is non-fatal — the in-memory value is correct
-    // for this session.
     console.warn("timer-scale.persist_failed", err);
   }
 }

@@ -179,6 +179,7 @@ export function WorkoutRunnerScreen({
         key={`${workoutId}:${currentGame.gameId}`}
         game={currentGame}
         relaxedScale={relaxedScale}
+        sessionId={workoutId}
         onComplete={(score) => void handleGameComplete(score)}
       />
 

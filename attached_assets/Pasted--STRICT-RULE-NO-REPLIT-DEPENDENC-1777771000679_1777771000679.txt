@@ -1,0 +1,73 @@
+=================================================================
+STRICT RULE — NO REPLIT DEPENDENCIES OR REPLIT-SPECIFIC TOOLS
+=================================================================
+Use only .env for config. No Replit-specific packages or storage.
+=================================================================
+
+CONTEXT:
+The runner needs concrete games (Prompt 13). We need a reusable
+framework so each game type is small.
+
+GOAL:
+A pluggable game framework. Each game implements a small
+interface; common concerns (timer, scoring, feedback, reporting)
+are shared.
+
+DELIVERABLES:
+1. /apps/mobile/src/games/types.ts:
+     export type GameDefinition<P, A> = {
+       slug: string;
+       title: string;
+       domain: Domain;
+       Component: React.FC<GameProps<P, A>>;
+       grade(item: GameItem<P>, answer: A): GameGrade;
+     };
+     export type GameProps<P, A> = {
+       item: GameItem<P>;
+       onSubmit(answer: A): void;
+       onSkip(): void;
+       relaxed: boolean;
+     };
+     export type GameGrade = {
+       correct: boolean;
+       score: number;       // 0..1000 normalised
+       explanation: string; // shown after answer
+     };
+2. /apps/mobile/src/games/components/Timer.tsx:
+     - Driven by relaxed-mode setting
+     - Timer scale: 100 (default) / 125 / 150 / 175 / 200 (off)
+     - Pauses when app backgrounds
+     - Calls onExpire if not in "off" mode
+3. /apps/mobile/src/games/components/FeedbackPanel.tsx:
+     - Shown after each item; renders explanation
+     - "Report a problem" button (FR-4.4) → opens a sheet that
+       posts to /reports/content
+4. /apps/mobile/src/games/components/GameContainer.tsx:
+     - Loads items via /games/:slug/items
+     - Iterates 5 items per session
+     - Tracks per-item time and correctness
+     - Emits a single GAME_COMPLETED ProgressEvent at end with a
+       payload of per-item results
+5. /apps/mobile/src/games/registry.ts: a Map<slug, GameDefinition>
+   that imports each game module. The runner imports the registry
+   and looks up by slug.
+6. Storybook-light: a /apps/mobile/src/screens/dev/GamePreview.tsx
+   gated behind __DEV__ that lets you preview any game with mock
+   items.
+7. Tests:
+     - Timer ticks down, calls onExpire at 0 in 100% scale
+     - Timer never expires in 200% (off) scale
+     - GameContainer flushes exactly one GAME_COMPLETED event
+       even if the user submits 5 items
+
+DO NOT:
+- Bake a specific game's logic into GameContainer.
+- Send raw timer ticks to the backend.
+
+VERIFY:
+- Each game implements only `Component` + `grade`.
+- Backgrounding/foregrounding the app does not corrupt timer
+  state or duplicate ProgressEvents.
+
+OUTPUT:
+TypeScript snippet of a hello-world game using the framework.

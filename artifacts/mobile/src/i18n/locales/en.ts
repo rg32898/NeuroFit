@@ -165,6 +165,45 @@ export const en = {
     cancel: "Cancel",
     dismiss: "Dismiss",
   },
+  gameFramework: {
+    loading: "Loading items…",
+    loadError: "Couldn't load this game's items.",
+    noItems: "No items available right now.",
+    unknownGame: "We can't find a game called \"{{slug}}\" yet.",
+    progress: "Item {{current}} of {{total}}",
+    timeExpired: "Time's up — moving on.",
+  },
+  feedback: {
+    correct: "Correct",
+    incorrect: "Not quite",
+    continue: "Continue",
+    report: "Report a problem",
+  },
+  report: {
+    title: "Report this item",
+    subtitle: "Tell us what's wrong and we'll review it.",
+    messagePlaceholder: "Add detail (optional)",
+    submit: "Submit report",
+    cancel: "Cancel",
+    close: "Close",
+    dismiss: "Dismiss",
+    success: "Thanks — your report is in the queue.",
+    categories: {
+      inappropriate: "Inappropriate content",
+      broken: "Broken or unclear",
+      incorrect: "Wrong answer key",
+      spam: "Spam",
+      copyright: "Copyright concern",
+      other: "Other",
+    },
+  },
+  games: {
+    hello: {
+      eyebrow: "Quick math",
+      choiceLabel: "Answer {{value}}",
+      skip: "Skip",
+    },
+  },
 } as const;
 
 export type Translations = typeof en;
