@@ -172,6 +172,9 @@ export const en = {
     unknownGame: "We can't find a game called \"{{slug}}\" yet.",
     progress: "Item {{current}} of {{total}}",
     timeExpired: "Time's up — moving on.",
+    tutorial: {
+      gotIt: "Got it",
+    },
   },
   feedback: {
     correct: "Correct",
@@ -198,10 +201,49 @@ export const en = {
     },
   },
   games: {
+    common: {
+      skip: "Skip",
+      submit: "Submit",
+    },
     hello: {
       eyebrow: "Quick math",
       choiceLabel: "Answer {{value}}",
       skip: "Skip",
+    },
+    synonymMatch: {
+      eyebrow: "Pick the synonym",
+      choiceLabel: "Answer {{value}}",
+      tutorial: {
+        title: "Synonym Match",
+        body: "You'll see a word at the top and four options. Tap the one that means the closest to the same thing.",
+      },
+    },
+    mentalArith: {
+      eyebrow: "Solve it",
+      inputPlaceholder: "Your answer",
+      tutorial: {
+        title: "Mental Arithmetic",
+        body: "Calculate the expression in your head and type the answer. Negative answers are fine — just include the minus sign.",
+      },
+    },
+    pairsRecall: {
+      eyebrow: "Memorise the grid",
+      studyPrompt: "Study the grid — {{seconds}}s left.",
+      recallPrompt: "Tap a cell that contained \"{{word}}\".",
+      cellLabelShown: "Row {{row}}, column {{col}}: {{word}}",
+      cellLabelHidden: "Row {{row}}, column {{col}}: hidden",
+      tutorial: {
+        title: "Pairs Recall",
+        body: "A 4×4 grid of words appears for a few seconds — each word shows up twice. When the grid hides, tap a cell that held the word we ask about.",
+      },
+    },
+    detail: {
+      eyebrow: "Read carefully",
+      choiceLabel: "Question {{question}}, answer {{value}}",
+      tutorial: {
+        title: "Reading Detail",
+        body: "Read the short passage, then answer the questions below. You can scroll the passage if it's longer than the screen.",
+      },
     },
   },
 } as const;

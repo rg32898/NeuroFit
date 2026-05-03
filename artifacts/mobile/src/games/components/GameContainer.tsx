@@ -20,7 +20,9 @@ import type {
   GameItemResult,
 } from "../types";
 import { FeedbackPanel } from "./FeedbackPanel";
+import { GameTutorial } from "./GameTutorial";
 import { Timer } from "./Timer";
+import { useTutorialSeen } from "../../lib/tutorial-storage";
 
 /**
  * Mirrors the server constant `GAME_COMPLETED_EVENT_TYPE` from
@@ -115,6 +117,11 @@ export function GameContainer({
   const timerOff = timerScale >= TIMER_OFF_SCALE;
   const baseSeconds =
     definition?.baseSeconds ?? game.averageDurationSec ?? DEFAULT_BASE_SECONDS;
+
+  // Tutorial gate (FR-4.8). The hook is always called — React's rules
+  // of hooks forbid conditional invocation. When the definition has no
+  // tutorial OR the flag is already set, we just fall through.
+  const tutorial = useTutorialSeen(game.slug);
 
   const items: ReadonlyArray<GameItem<unknown>> =
     itemsOverride ?? itemsQuery.data ?? [];
@@ -286,6 +293,31 @@ export function GameContainer({
         </Text>
       </Card>
     );
+  }
+
+  // Tutorial gate. Once `seen` is false we block rendering of the game
+  // itself until the user acknowledges. While `seen` is undefined we
+  // show a neutral loading card so the tutorial doesn't flash for users
+  // who have already dismissed it on a previous run.
+  if (definition.tutorial) {
+    if (tutorial.seen === undefined) {
+      return (
+        <Card>
+          <Text variant="body" tone="muted">
+            {t("gameFramework.loading")}
+          </Text>
+        </Card>
+      );
+    }
+    if (tutorial.seen === false) {
+      return (
+        <GameTutorial
+          gameTitle={definition.title}
+          content={definition.tutorial}
+          onAcknowledged={() => void tutorial.markSeen()}
+        />
+      );
+    }
   }
 
   if (!itemsOverride && itemsQuery.isLoading) {

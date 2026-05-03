@@ -21,97 +21,235 @@ function cuid(): string {
   return "c" + Math.random().toString(36).slice(2, 11) + Date.now().toString(36);
 }
 
+/**
+ * Catalogue (Prompt 15). One game per primary cognitive domain. Each
+ * game's payload schema matches the `GameDefinition` in the matching
+ * mobile module exactly — drift between the two would surface as a
+ * grade-time crash, so keep them in lockstep.
+ */
 const GAMES = [
   {
-    slug: "word-burst",
-    title: "Word Burst",
+    slug: "synonym-match",
+    title: "Synonym Match",
     domain: "vocabulary",
-    description: "Identify synonyms and definitions under time pressure.",
+    description: "Pick the closest synonym for a target word.",
     averageDurationSec: 90,
     supportsRelaxed: true,
     isFreeTier: true,
   },
   {
-    slug: "sentence-forge",
-    title: "Sentence Forge",
-    domain: "writing",
-    description: "Reconstruct scrambled sentences for clarity and flow.",
-    averageDurationSec: 120,
+    slug: "mental-arith",
+    title: "Mental Arithmetic",
+    domain: "math",
+    description: "Solve short arithmetic expressions in your head.",
+    averageDurationSec: 90,
     supportsRelaxed: true,
-    isFreeTier: false,
+    isFreeTier: true,
   },
   {
-    slug: "rapid-reader",
-    title: "Rapid Reader",
+    slug: "pairs-recall",
+    title: "Pairs Recall",
+    domain: "memory",
+    description: "Memorise a 4x4 grid of word pairs and recall positions.",
+    averageDurationSec: 120,
+    supportsRelaxed: true,
+    isFreeTier: true,
+  },
+  {
+    slug: "reading-detail",
+    title: "Reading Detail",
     domain: "reading",
-    description: "Answer comprehension questions after fast reading passages.",
+    description: "Read a short passage and answer detail questions.",
     averageDurationSec: 150,
     supportsRelaxed: true,
     isFreeTier: false,
-  },
-  {
-    slug: "echo-back",
-    title: "Echo Back",
-    domain: "speaking",
-    description: "Repeat increasingly complex phrases with correct phrasing.",
-    averageDurationSec: 60,
-    supportsRelaxed: false,
-    isFreeTier: false,
-  },
-  {
-    slug: "number-chain",
-    title: "Number Chain",
-    domain: "math",
-    description: "Solve chained arithmetic operations against the clock.",
-    averageDurationSec: 90,
-    supportsRelaxed: true,
-    isFreeTier: true,
-  },
-  {
-    slug: "grid-recall",
-    title: "Grid Recall",
-    domain: "memory",
-    description: "Memorise and reproduce a growing grid of symbols.",
-    averageDurationSec: 90,
-    supportsRelaxed: true,
-    isFreeTier: true,
   },
 ] as const;
 
 type GameSlug = (typeof GAMES)[number]["slug"];
 
-const ITEM_PAYLOADS: Record<GameSlug, (band: number) => Record<string, unknown>> = {
-  "word-burst": (band) => ({
-    word: ["luminous", "ephemeral", "taciturn", "mendacious", "equivocal"][band - 1],
-    choices: ["bright", "temporary", "silent", "lying", "ambiguous"],
-    answer: band - 1,
-  }),
-  "sentence-forge": (band) => ({
-    words: ["The", "cat", "sat", "on", "the", "mat"].slice(0, band + 2),
-    answer: "The cat sat on the mat",
-  }),
-  "rapid-reader": (band) => ({
-    passage: `Reading passage at difficulty level ${band}.`,
-    question: "What was the main topic?",
-    answer: "cognition",
-  }),
-  "echo-back": (band) => ({
-    phrase: [
-      "Go",
-      "Come here",
-      "Sit down now",
-      "Please open the window",
-      "Would you mind closing the door",
-    ][band - 1],
-  }),
-  "number-chain": (band) => ({
-    expression: `${band * 3} + ${band * 2} - ${band}`,
-    answer: band * 4,
-  }),
-  "grid-recall": (band) => ({
-    grid: Array.from({ length: band * 2 }, (_, i) => i % 4),
-    size: band + 2,
-  }),
+// ── Per-slug item content ────────────────────────────────────────────────
+//
+// Five well-formed items per game (one per difficulty band 1..5). The
+// mobile app NEVER hard-codes any of this content — it always comes from
+// the API.
+
+const SYNONYM_ITEMS = [
+  {
+    word: "happy",
+    options: ["sad", "glad", "angry", "tired"],
+    answer: 1,
+  },
+  {
+    word: "begin",
+    options: ["end", "stop", "start", "pause"],
+    answer: 2,
+  },
+  {
+    word: "swift",
+    options: ["slow", "fast", "heavy", "wide"],
+    answer: 1,
+  },
+  {
+    word: "elated",
+    options: ["overjoyed", "despondent", "weary", "calm"],
+    answer: 0,
+  },
+  {
+    word: "petulant",
+    options: ["serene", "cheerful", "irritable", "wise"],
+    answer: 2,
+  },
+] as const;
+
+const MENTAL_ARITH_ITEMS = [
+  { expression: "3 + 4", answer: 7 },
+  { expression: "12 - 5", answer: 7 },
+  { expression: "8 + 17 - 6", answer: 19 },
+  { expression: "25 - 13 + 8", answer: 20 },
+  // Intermediate goes negative; final answer is also negative — exercises
+  // the "no negative-number trap" requirement.
+  { expression: "5 - 8 - 2", answer: -5 },
+] as const;
+
+/** Build a deterministic 4×4 grid where each of 8 unique words appears 2×. */
+function buildPairsGrid(words: ReadonlyArray<string>, seed: number): string[][] {
+  if (words.length !== 8) {
+    throw new Error(`Pairs grid needs exactly 8 unique words, got ${words.length}`);
+  }
+  const cells = [...words, ...words];
+  // Deterministic shuffle by seed so re-running the seed gives the same grid.
+  const sorted = cells
+    .map((w, i) => ({ w, k: ((i + 1) * 2654435761 + seed) >>> 0 }))
+    .sort((a, b) => a.k - b.k)
+    .map((x) => x.w);
+  return [
+    sorted.slice(0, 4),
+    sorted.slice(4, 8),
+    sorted.slice(8, 12),
+    sorted.slice(12, 16),
+  ];
+}
+
+const PAIRS_RECALL_ITEMS = [
+  buildPairsGrid(["sun", "moon", "star", "cloud", "rain", "snow", "wind", "leaf"], 1),
+  buildPairsGrid(["cat", "dog", "fish", "bird", "ant", "bee", "fox", "owl"], 2),
+  buildPairsGrid(["red", "blue", "green", "gold", "pink", "grey", "teal", "lime"], 3),
+  buildPairsGrid(["river", "lake", "hill", "wood", "rock", "moss", "sand", "snow"], 4),
+  buildPairsGrid(["piano", "drum", "flute", "harp", "viola", "tuba", "lute", "oboe"], 5),
+].map((grid) => ({ grid }));
+
+const READING_DETAIL_ITEMS = [
+  {
+    passage:
+      "Otters use small stones to crack open shells. They store a favourite stone in a flap of skin under the foreleg and bring it out at meal times.",
+    questions: [
+      {
+        q: "What do otters use stones for?",
+        options: ["Building dams", "Cracking shells", "Marking territory", "Sharpening teeth"],
+        answer: 1,
+      },
+      {
+        q: "Where do otters keep their favourite stone?",
+        options: [
+          "In a riverbank burrow",
+          "Under a foreleg flap of skin",
+          "In their mouth",
+          "Wrapped in seaweed",
+        ],
+        answer: 1,
+      },
+    ],
+  },
+  {
+    passage:
+      "The first lighthouse on Eddystone Reef, off Plymouth, was built in 1698 of wood and lasted only five years before a great storm carried it away.",
+    questions: [
+      {
+        q: "When was the first Eddystone lighthouse built?",
+        options: ["1598", "1698", "1798", "1898"],
+        answer: 1,
+      },
+      {
+        q: "How was the first lighthouse destroyed?",
+        options: ["Fire", "A storm", "Erosion", "It was dismantled"],
+        answer: 1,
+      },
+    ],
+  },
+  {
+    passage:
+      "Sourdough bread relies on a culture of wild yeast and lactic-acid bacteria. The bacteria slowly produce acids that break down gluten, giving the bread its tang and chewy crumb.",
+    questions: [
+      {
+        q: "What two things live in a sourdough culture?",
+        options: [
+          "Yeast and salt",
+          "Yeast and bacteria",
+          "Bacteria and sugar",
+          "Mould and yeast",
+        ],
+        answer: 1,
+      },
+      {
+        q: "What gives sourdough its characteristic tang?",
+        options: ["Added vinegar", "Long baking time", "Acids from bacteria", "Rye flour"],
+        answer: 2,
+      },
+    ],
+  },
+  {
+    passage:
+      "Captain James Cook's third voyage left Plymouth in 1776, intending to find the Northwest Passage. Cook himself was killed in Hawai'i in 1779 before the expedition returned home.",
+    questions: [
+      {
+        q: "What was Cook's third voyage looking for?",
+        options: [
+          "The South Pole",
+          "The Northwest Passage",
+          "Australia",
+          "The source of the Nile",
+        ],
+        answer: 1,
+      },
+      {
+        q: "Where was Cook killed?",
+        options: ["Tahiti", "New Zealand", "Hawai'i", "Plymouth"],
+        answer: 2,
+      },
+    ],
+  },
+  {
+    passage:
+      "Mycorrhizal fungi form symbiotic networks with the roots of most land plants. The fungi extend the effective root surface area, supplying water and minerals in exchange for sugars produced by photosynthesis.",
+    questions: [
+      {
+        q: "What do mycorrhizal fungi receive from the plant?",
+        options: ["Water", "Minerals", "Sugars", "Nitrogen"],
+        answer: 2,
+      },
+      {
+        q: "What benefit does the plant gain from the fungi?",
+        options: [
+          "Protection from herbivores",
+          "Greater root surface area",
+          "Faster germination",
+          "Nitrogen fixation",
+        ],
+        answer: 1,
+      },
+    ],
+  },
+] as const;
+
+const ITEM_PAYLOADS: Record<GameSlug, ReadonlyArray<Record<string, unknown>>> = {
+  "synonym-match": SYNONYM_ITEMS.map((it) => ({ ...it, options: [...it.options] })),
+  "mental-arith": MENTAL_ARITH_ITEMS.map((it) => ({ ...it })),
+  "pairs-recall": PAIRS_RECALL_ITEMS,
+  "reading-detail": READING_DETAIL_ITEMS.map((it) => ({
+    ...it,
+    questions: it.questions.map((q) => ({ ...q, options: [...q.options] })),
+  })),
 };
 
 async function seed() {
@@ -126,16 +264,22 @@ async function seed() {
   await db.insert(gamesTable).values(gameRows).onConflictDoNothing();
   console.log(`  Inserted ${gameRows.length} games.`);
 
-  const itemRows = gameRows.flatMap((game) =>
-    ([1, 2, 3, 4, 5] as const).map((band) => ({
+  const itemRows = gameRows.flatMap((game) => {
+    const payloads = ITEM_PAYLOADS[game.slug as GameSlug];
+    if (payloads.length !== 5) {
+      throw new Error(
+        `Seed bug: ${game.slug} must have exactly 5 items, got ${payloads.length}`,
+      );
+    }
+    return payloads.map((payload, idx) => ({
       id: cuid(),
       gameId: game.id,
-      payload: ITEM_PAYLOADS[game.slug](band),
-      difficultyBand: band,
+      payload,
+      difficultyBand: idx + 1,
       version: 1,
       isPublished: true,
-    })),
-  );
+    }));
+  });
 
   await db.insert(gameItemsTable).values(itemRows).onConflictDoNothing();
   console.log(`  Inserted ${itemRows.length} game items (5 per game).`);

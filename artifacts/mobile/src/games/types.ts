@@ -1,16 +1,26 @@
 import type * as React from "react";
 
 /**
- * Cognitive domains the catalogue and proficiency engine track. Kept
- * narrow on purpose — adding a new domain requires backend mirror work.
+ * Cognitive domains the catalogue and proficiency engine track. Mirrors
+ * `lib/shared/src/profile.ts#DOMAINS` exactly — adding a new value here
+ * requires the same change server-side.
  */
 export type Domain =
-  | "memory"
-  | "attention"
-  | "language"
+  | "vocabulary"
+  | "writing"
+  | "reading"
+  | "speaking"
   | "math"
-  | "reaction"
-  | "logic";
+  | "memory";
+
+/**
+ * One-screen tutorial shown the first time a user opens a given game
+ * (FR-4.8). Both fields are i18n keys so copy lives in `locales/`.
+ */
+export type GameTutorialContent = {
+  title: string;
+  body: string;
+};
 
 /**
  * A single playable item served by `/api/games/:slug/items`. The
@@ -54,6 +64,12 @@ export type GameDefinition<P, A> = {
   baseSeconds?: number;
   Component: React.FC<GameProps<P, A>>;
   grade(item: GameItem<P>, answer: A): GameGrade;
+  /**
+   * Optional one-screen tutorial. When set, GameContainer renders the
+   * tutorial the first time the user opens this game and writes a flag
+   * to secure-store so it never shows again on this device.
+   */
+  tutorial?: GameTutorialContent;
 };
 
 /**
