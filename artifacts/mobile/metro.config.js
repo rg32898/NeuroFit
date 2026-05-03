@@ -64,18 +64,27 @@ config.resolver.extraNodeModules = {
 // `react`, `react-dom`, etc. to resolve from this artifact's node_modules.
 const prevResolveRequest = config.resolver.resolveRequest;
 config.resolver.resolveRequest = (context, moduleName, platform) => {
-  // Match exact name or sub-path imports like `react/jsx-runtime`.
-  for (const singleton of singletonModules) {
-    if (
-      moduleName === singleton ||
-      moduleName.startsWith(`${singleton}/`)
-    ) {
-      const root = extraNodeModules[singleton];
-      // If the singleton isn't actually installed, fall through to default
-      // resolution instead of building an `"undefined…"` path that crashes.
-      if (!root) break;
-      const sub = moduleName.slice(singleton.length); // "" or "/foo"
-      return context.resolveRequest(context, `${root}${sub}`, platform);
+  // The "3 react copies" bug only manifests in the WEB bundle (Metro's
+  // node-resolution under pnpm picks different transitively-installed
+  // copies). On iOS/Android, Metro's platform-aware haste map already
+  // returns a single react-native module from the project's own
+  // node_modules, and intercepting it here can defeat the platform
+  // overlay (.ios.js / .android.js files). Scope the override to web
+  // so native resolution is left untouched.
+  if (platform === "web") {
+    for (const singleton of singletonModules) {
+      if (
+        moduleName === singleton ||
+        moduleName.startsWith(`${singleton}/`)
+      ) {
+        const root = extraNodeModules[singleton];
+        // If the singleton isn't actually installed, fall through to
+        // default resolution instead of building an `"undefined…"` path
+        // that crashes.
+        if (!root) break;
+        const sub = moduleName.slice(singleton.length); // "" or "/foo"
+        return context.resolveRequest(context, `${root}${sub}`, platform);
+      }
     }
   }
   if (prevResolveRequest) {
